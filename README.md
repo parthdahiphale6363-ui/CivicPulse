@@ -11,7 +11,21 @@
     *   Once connected, it will ask for environment variables:
         *   `GROQ_API_KEY`: Your Groq API Key.
         *   `SECRET_KEY`: Any long random string (for session security).
-4.  **Deploy**: Click **"Apply"**. Render will build the environment and provide you with a `onrender.com` URL.
+4. **Deploy**: Click **"Apply"**. Render will build the environment and provide you with a `onrender.com` URL.
+
+## ⚡ Deployment (Vercel alternative)
+
+1.  **Install Vercel CLI**: `npm i -g vercel` (or connect via [vercel.com](https://vercel.com)).
+2.  **Import Project**: Connect your GitHub repo.
+3.  **Config Env**: Add `GROQ_API_KEY` and `SECRET_KEY` in settings.
+4.  **Deploy**: Vercel will use the `vercel.json` file I created.
+
+> [!CAUTION]
+> **Vercel Limitations**: Vercel uses Serverless Functions. This means:
+> 1. **No SQLite Support**: Your database will reset on every single request.
+> 2. **No Image Uploads**: You cannot save images to `static/uploads/`.
+> 
+> **Render is strongly recommended** for this specific project because it supports persistent disk and standard long-running processes.
 
 > [!IMPORTANT]
 > **Ephemeral Filesystem Note**: On the free tier, images uploaded to `static/uploads/` and the `database.db` file will be wiped every time the server restarts (which happens at least once a day). For a permanent production app, consider using **Render Persistent Disks** or external services like **Cloudinary** for images and **Supabase/PostgreSQL** for the database.
