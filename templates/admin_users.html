@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Manage Users — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="complaints-page">
+    <div class="complaints-header">
+        <div>
+            <h1 style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">
+                <i class="fas fa-users-cog" style="color: var(--primary-light);"></i> Manage Users
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 14px;">View and manage registered users</p>
+        </div>
+        <a href="/dashboard" class="btn btn-outline btn-sm">
+            <i class="fas fa-arrow-left"></i> Back to Dashboard
+        </a>
+    </div>
+
+    {% if users %}
+    <div class="complaints-table-wrap reveal">
+        <table class="complaints-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Full Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Mobile</th>
+                    <th>Role</th>
+                    <th>Registered</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in users %}
+                <tr>
+                    <td><strong>#{{ u.id }}</strong></td>
+                    <td>{{ u.fullname }}</td>
+                    <td style="color: var(--primary-light);">{{ u.username }}</td>
+                    <td style="color: var(--text-secondary);">{{ u.email }}</td>
+                    <td style="color: var(--text-secondary);">{{ u.mobile }}</td>
+                    <td>
+                        <span class="priority-badge {% if u.role == 'admin' %}priority-high{% else %}priority-low{% endif %}">
+                            {{ u.role or 'user' }}
+                        </span>
+                    </td>
+                    <td style="color: var(--text-secondary); font-size: 13px;">
+                        {{ u.created_at[:10] if u.created_at else '—' }}
+                    </td>
+                    <td>
+                        <a href="/admin/user/delete/{{ u.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this user?')">
+                            <i class="fas fa-trash"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state reveal">
+        <i class="fas fa-users"></i>
+        <h3>No Users Registered</h3>
+        <p>Users will appear here once they register.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

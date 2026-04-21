@@ -1,0 +1,267 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard — CivicPulse{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+#civicMap { height: 400px; width: 100%; border-radius: var(--radius-sm); z-index: 1;}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-page">
+    <div class="dashboard-header reveal">
+        <h1><i class="fas fa-chart-bar" style="color: var(--primary-light);"></i> Admin Dashboard</h1>
+        <p>AI-powered overview of all civic complaints and analytics</p>
+        <div style="display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap;">
+            <a href="/export/csv" class="btn btn-outline btn-sm"><i class="fas fa-download"></i> Export CSV</a>
+            <a href="/admin/users" class="btn btn-outline btn-sm"><i class="fas fa-users-cog"></i> Manage Users</a>
+            <a href="/complaints" class="btn btn-outline btn-sm"><i class="fas fa-list-alt"></i> All Complaints</a>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="dashboard-stats">
+        <div class="dash-stat reveal reveal-delay-1">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary);">Total</span>
+                <i class="fas fa-clipboard-list" style="color: var(--primary-light);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--primary-light);">{{ total }}</div>
+            <div class="dash-stat-label">Total Complaints</div>
+        </div>
+        <div class="dash-stat reveal reveal-delay-2">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary);">Pending</span>
+                <i class="fas fa-clock" style="color: var(--warning);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--warning);">{{ pending }}</div>
+            <div class="dash-stat-label">Awaiting Resolution</div>
+        </div>
+        <div class="dash-stat reveal reveal-delay-3">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary);">Resolved</span>
+                <i class="fas fa-check-circle" style="color: var(--success);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--success);">{{ resolved }}</div>
+            <div class="dash-stat-label">Successfully Resolved</div>
+        </div>
+        <div class="dash-stat reveal reveal-delay-4">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary);">Users</span>
+                <i class="fas fa-users" style="color: var(--accent);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--accent);">{{ users_count }}</div>
+            <div class="dash-stat-label">Registered Users</div>
+        </div>
+    </div>
+
+    <!-- Priority Stats -->
+    <div class="dashboard-stats" style="margin-bottom: 36px;">
+        <div class="dash-stat reveal">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary);">High Priority</span>
+                <i class="fas fa-exclamation-circle" style="color: var(--danger);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--danger);">{{ high }}</div>
+            <div class="dash-stat-label">Urgent Issues</div>
+        </div>
+        <div class="dash-stat reveal">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary);">Medium Priority</span>
+                <i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--warning);">{{ medium }}</div>
+            <div class="dash-stat-label">Moderate Issues</div>
+        </div>
+        <div class="dash-stat reveal">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary);">Low Priority</span>
+                <i class="fas fa-info-circle" style="color: var(--success);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--success);">{{ low }}</div>
+            <div class="dash-stat-label">Minor Issues</div>
+        </div>
+    </div>
+
+    <!-- AI Summary -->
+    <div class="ai-summary-box reveal">
+        <h3><i class="fas fa-robot"></i> AI-Powered Insights <span class="ai-badge"><i class="fas fa-sparkles"></i> Groq AI</span></h3>
+        <div id="aiSummaryContent" class="ai-summary-content">
+            <div class="ai-summary-loading">
+                <div class="dot-pulse"><span></span><span></span><span></span></div>
+                <span>Generating AI insights...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Grid -->
+    <div class="dashboard-grid">
+        <div class="dash-card full-width reveal">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-map-marked-alt" style="color: var(--warning);"></i> Civic Health Heatmap</h3>
+            </div>
+            <div id="civicMap"></div>
+        </div>
+
+        <div class="dash-card reveal">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-chart-pie" style="color: var(--primary-light);"></i> Priority Distribution</h3>
+            </div>
+            <div class="chart-container">
+                <canvas id="priorityChart"></canvas>
+            </div>
+        </div>
+        <div class="dash-card reveal">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-chart-bar" style="color: var(--success);"></i> Resolution Status</h3>
+            </div>
+            <div class="chart-container">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+        <div class="dash-card full-width reveal">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-chart-area" style="color: var(--accent);"></i> Category Breakdown</h3>
+            </div>
+            <div class="chart-container">
+                <canvas id="categoryChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Complaints Table -->
+    <div class="dash-card full-width reveal" style="margin-top: 24px;">
+        <div class="dash-card-header">
+            <h3><i class="fas fa-history" style="color: var(--primary-light);"></i> Recent Complaints</h3>
+            <a href="/complaints" class="btn btn-outline btn-sm">View All</a>
+        </div>
+
+        {% if recent %}
+        <div class="complaints-table-wrap" style="border: none; border-radius: 0;">
+            <table class="complaints-table">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in recent %}
+                    <tr>
+                        <td><strong>#{{ c.id }}</strong></td>
+                        <td>
+                            <span class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
+                                {{ c.category or 'Other' }}
+                            </span>
+                        </td>
+                        <td><span class="complaint-desc">{{ c.description }}</span></td>
+                        <td><span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span></td>
+                        <td><span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span></td>
+                        <td>
+                            <div class="actions">
+                                <a href="/complaint/{{ c.id }}" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i></a>
+                                {% if c.status != 'Resolved' %}
+                                <a href="/resolve/{{ c.id }}" class="btn btn-sm btn-success"><i class="fas fa-check"></i></a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-inbox"></i>
+            <h3>No complaints yet</h3>
+            <p>Complaints will appear here once citizens start reporting.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Announcements Management -->
+    <div class="dashboard-grid" style="margin-top: 24px;">
+        <div class="dash-card reveal">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-bullhorn" style="color: var(--warning);"></i> Create Announcement</h3>
+            </div>
+            <form action="/announcement" method="POST">
+                <div class="form-group">
+                    <label>Title</label>
+                    <input type="text" name="title" placeholder="Announcement title" required
+                        style="width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif;">
+                </div>
+                <div class="form-group">
+                    <label>Content</label>
+                    <textarea name="content" placeholder="Announcement content..." required rows="3"
+                        style="width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical;"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-paper-plane"></i> Publish
+                </button>
+            </form>
+        </div>
+        <div class="dash-card reveal">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-list" style="color: var(--accent);"></i> Active Announcements</h3>
+            </div>
+            {% if announcements %}
+                {% for a in announcements %}
+                <div style="padding: 12px; background: rgba(15, 23, 42, 0.3); border-radius: var(--radius-sm); margin-bottom: 10px; border: 1px solid var(--border-light);">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <strong style="font-size: 14px;">{{ a.title }}</strong>
+                        <a href="/announcement/delete/{{ a.id }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete this announcement?')" style="padding: 4px 8px;">
+                            <i class="fas fa-times"></i>
+                        </a>
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 13px; margin-top: 4px;">{{ a.content[:100] }}{% if a.content|length > 100 %}...{% endif %}</p>
+                    <span style="color: var(--text-muted); font-size: 11px;">{{ a.created_at[:10] if a.created_at else '' }}</span>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p style="color: var(--text-muted); font-size: 14px;">No announcements yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var map = L.map('civicMap').setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(map);
+
+    fetch('/api/map-data')
+    .then(r => r.json())
+    .then(data => {
+        if(data && data.length > 0) {
+            let bounds = [];
+            data.forEach(c => {
+                let color = '#10b981'; // Green (Low)
+                if (c.priority === 'High' || c.priority === 'Urgent') color = '#ef4444'; // Red
+                else if (c.priority === 'Medium') color = '#f59e0b'; // Orange
+                
+                let marker = L.circleMarker([c.lat, c.lng], {
+                    radius: 8,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 1,
+                    opacity: 0.3,
+                    fillOpacity: 0.8
+                }).addTo(map);
+                marker.bindPopup(`<b>#${c.id} ${c.category}</b><br>Priority: ${c.priority}<br>Status: ${c.status}`);
+                bounds.push([c.lat, c.lng]);
+            });
+            if (bounds.length > 0) map.fitBounds(bounds, {padding: [30,30]});
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Community — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="complaints-page">
+    <div class="section-header reveal" style="margin-bottom: 32px;">
+        <div class="section-badge"><i class="fas fa-users"></i> Community Hub</div>
+        <h2 class="section-title">Community Board</h2>
+        <p class="section-description">Stay updated with announcements and see trending issues</p>
+    </div>
+
+    <!-- Announcements -->
+    {% if announcements %}
+    <div style="margin-bottom: 48px;">
+        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;" class="reveal">
+            <i class="fas fa-bullhorn" style="color: var(--warning);"></i> Announcements
+        </h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+            {% for a in announcements %}
+            <div class="dept-card reveal reveal-delay-{{ loop.index % 4 + 1 }}">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                    <i class="fas fa-megaphone" style="color: var(--warning);"></i>
+                    <h4 style="font-size: 16px; font-weight: 700;">{{ a.title }}</h4>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin-bottom: 12px;">{{ a.content }}</p>
+                <div style="display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: 12px;">
+                    <i class="fas fa-user-shield"></i> {{ a.author }}
+                    <span>·</span>
+                    <i class="fas fa-clock"></i> {{ a.created_at[:10] if a.created_at else '' }}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Top Upvoted Issues -->
+    <div>
+        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;" class="reveal">
+            <i class="fas fa-fire" style="color: var(--danger);"></i> Trending Issues
+            <span style="font-size: 12px; color: var(--text-muted); font-weight: 400;">Most upvoted by citizens</span>
+        </h3>
+
+        {% if top_complaints %}
+        <div class="complaint-list">
+            {% for c in top_complaints %}
+            <a href="/complaint/{{ c.id }}" class="complaint-item reveal" style="text-decoration: none; color: inherit;">
+                <div style="display: flex; align-items: center; gap: 6px; min-width: 50px;">
+                    <i class="fas fa-arrow-up" style="color: var(--primary-light);"></i>
+                    <strong style="font-size: 16px; color: var(--primary-light);">{{ c.upvotes or 0 }}</strong>
+                </div>
+                <span class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
+                    {{ c.category or 'Other' }}
+                </span>
+                <div class="complaint-info">
+                    <h4>{{ c.description[:80] }}{% if c.description|length > 80 %}...{% endif %}</h4>
+                    <p>{{ c.created_at[:10] if c.created_at else 'Recently' }} {% if c.location %}· {{ c.location }}{% endif %}</p>
+                </div>
+                <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+                <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+            </a>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state reveal">
+            <i class="fas fa-heart"></i>
+            <h3>No trending issues yet</h3>
+            <p>Upvote complaints to help prioritize the most important issues!</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

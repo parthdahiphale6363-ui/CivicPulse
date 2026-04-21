@@ -1,0 +1,504 @@
+{% extends "base.html" %}
+{% block title %}Complaint #{{ complaint.id }} — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="detail-page">
+    <a href="/complaints" class="btn btn-outline btn-sm" style="margin-bottom: 20px;">
+        <i class="fas fa-arrow-left"></i> Back to Complaints
+    </a>
+
+    <div class="detail-card reveal">
+        <div class="detail-header">
+            <div>
+                <h2 style="font-size: 22px; font-weight: 700;">
+                    Complaint #{{ complaint.id }}
+                </h2>
+                <p style="color: var(--text-secondary); font-size: 14px; margin-top: 4px;">
+                    Filed {{ complaint.created_at or 'recently' }}
+                </p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+                <span class="priority-badge priority-{{ complaint.priority|lower }}">{{ complaint.priority }} Priority</span>
+                <span class="status-badge status-{{ complaint.status|lower }}">{{ complaint.status }}</span>
+            </div>
+        </div>
+
+        <div class="detail-body">
+            <!-- Meta info -->
+            <div class="detail-meta">
+                <div class="meta-item">
+                    <label>Category</label>
+                    <span>
+                        <span class="complaint-category-badge badge-{{ complaint.category|lower|replace(' ', '') if complaint.category else 'default' }}">
+                            {{ complaint.category or 'Other' }}
+                        </span>
+                    </span>
+                </div>
+                <div class="meta-item">
+                    <label>Location</label>
+                    <span>{{ complaint.location if complaint.location else 'Not specified' }}</span>
+                </div>
+                <div class="meta-item">
+                    <label>Upvotes</label>
+                    <span><i class="fas fa-arrow-up" style="color: var(--primary-light);"></i> {{ complaint.upvotes or 0 }}</span>
+                </div>
+                {% if complaint.resolved_at %}
+                <div class="meta-item">
+                    <label>Resolved On</label>
+                    <span>{{ complaint.resolved_at }}</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- AI RESOLUTION PREDICTOR -->
+            <div class="detail-section" id="predictionSection" style="background: rgba(16, 185, 129, 0.05); padding: 20px; border-radius: var(--radius-md); border: 1px dashed rgba(16, 185, 129, 0.3); display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px;">
+                <div>
+                    <h3 style="color: var(--success); font-size: 15px; margin-bottom: 4px;"><i class="fas fa-clock"></i> AI Resolution Predictor</h3>
+                    <p style="font-size: 12px; color: var(--text-secondary);" id="predText">Predicting timeframe and assigned department...</p>
+                </div>
+                </div>
+                <div style="text-align: right; min-width: 120px;" id="predStats">
+                    <i class="fas fa-spinner fa-spin" style="color: var(--success);"></i>
+                </div>
+            </div>
+
+            <!-- AI IMPACT SCORE -->
+            <div class="detail-section" id="impactSection" style="background: rgba(192, 38, 211, 0.05); padding: 20px; border-radius: var(--radius-md); border: 1px dashed rgba(192, 38, 211, 0.3); display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px;">
+                <div>
+                    <h3 style="color: var(--primary-light); font-size: 15px; margin-bottom: 4px;"><i class="fas fa-bolt"></i> Civic Impact Score</h3>
+                    <p style="font-size: 12px; color: var(--text-secondary);" id="impactText">Analyzing community severity, layout, and historical data...</p>
+                </div>
+                <div style="text-align: right; min-width: 120px;" id="impactStats">
+                    <i class="fas fa-spinner fa-spin" style="color: var(--primary-light);"></i>
+                </div>
+            </div>
+
+            <!-- RESOLUTION ROADMAP (UNIQUE FEATURE) -->
+            <div class="detail-section roadmap-container" style="margin-bottom: 35px; background: rgba(15, 23, 42, 0.4); padding: 25px; border-radius: var(--radius-lg); border: 1px solid rgba(255,255,255,0.05);">
+                <h3 style="margin-bottom: 25px; font-size: 16px; color: var(--text-secondary);"><i class="fas fa-route" style="color: var(--accent);"></i> Complaint Journey</h3>
+                <div class="roadmap" style="display: flex; justify-content: space-between; position: relative;">
+                    <div class="roadmap-line" style="position: absolute; top: 15px; left: 10%; right: 10%; height: 2px; background: rgba(255,255,255,0.1); z-index: 1;"></div>
+                    <div class="roadmap-line-progress" style="position: absolute; top: 15px; left: 10%; width: {{ (complaint.status_step - 1) * 40 }}%; height: 2px; background: var(--accent); z-index: 2; transition: width 1s ease;"></div>
+                    
+                    <div class="roadmap-step {% if complaint.status_step >= 1 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
+                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 1 %}var(--accent){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a; transition: all 0.3s;">
+                            <i class="fas fa-file-alt" style="font-size: 12px; color: white;"></i>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 1 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Filed</div>
+                    </div>
+                    
+                    <div class="roadmap-step {% if complaint.status_step >= 2 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
+                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 2 %}var(--primary){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a;">
+                            <i class="fas fa-tools" style="font-size: 12px; color: white;"></i>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 2 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Assigned</div>
+                    </div>
+
+                    <div class="roadmap-step {% if complaint.status_step >= 3 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
+                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 3 %}var(--warning){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a;">
+                            <i class="fas fa-truck-pickup" style="font-size: 12px; color: white;"></i>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 3 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Dispatched</div>
+                    </div>
+
+                    <div class="roadmap-step {% if complaint.status_step >= 4 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
+                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 4 %}var(--success){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a;">
+                            <i class="fas fa-check" style="font-size: 12px; color: white;"></i>
+                        </div>
+                        <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 4 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Resolved</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div class="detail-section">
+                <h3><i class="fas fa-align-left"></i> Description</h3>
+                <p style="font-size: 16px; line-height: 1.6; color: var(--text-primary);">{{ complaint.description }}</p>
+            </div>
+
+            <!-- MULTIMEDIA EVIDENCE -->
+            {% if complaint.image_url or complaint.video_url %}
+            <div class="detail-section">
+                <h3><i class="fas fa-images"></i> Evidence Provided</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                    {% if complaint.image_url %}
+                    <div style="background: rgba(15, 23, 42, 0.4); padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <img src="{{ complaint.image_url }}" alt="Evidence Photo" 
+                             style="width: 100%; border-radius: var(--radius-sm); cursor: pointer; transition: transform 0.3s;"
+                             onclick="window.open(this.src)">
+                        <p style="text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 8px;">ENLARGED VIEW AVAILABLE ON CLICK</p>
+                    </div>
+                    {% endif %}
+                    
+                    {% if complaint.video_url %}
+                    <div style="background: rgba(15, 23, 42, 0.4); padding: 10px; border-radius: var(--radius-md); border: 1px solid var(--border);">
+                        <video src="{{ complaint.video_url }}" controls style="width: 100%; border-radius: var(--radius-sm);"></video>
+                        <p style="text-align: center; font-size: 11px; color: var(--text-muted); margin-top: 8px;">15-SEC VIDEO EVIDENCE</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Official Response (Blue Box) -->
+            {% if complaint.official_response or user_role == 'admin' %}
+            <div class="detail-section" id="officialResponseSection">
+                <h3 style="color: var(--info);"><i class="fas fa-user-shield"></i> Official Status Update</h3>
+                {% if complaint.official_response %}
+                <div style="background: rgba(59, 130, 246, 0.08); padding: 20px; border-radius: var(--radius-md); border-left: 4px solid var(--info); margin-bottom: 20px;">
+                    <p id="officialText" style="color: var(--text-primary); line-height: 1.6; font-weight: 500;">{{ complaint.official_response }}</p>
+                    <p id="simpleText" style="color: var(--success); line-height: 1.6; font-weight: 500; font-size:18px; display:none; background:rgba(16,185,129,0.1); padding:10px; border-radius:6px; margin-top:10px;"></p>
+                    
+                    <div style="margin-top: 15px; display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                            <i class="fas fa-check-circle" style="color: var(--info);"></i> Verified by Municipal Authority
+                        </span>
+                        
+                        <button type="button" onclick="explainSimply()" id="btnExplain" class="btn btn-outline" style="font-size: 11px; padding: 4px 10px; color:var(--success); border-color:var(--success);">
+                            <i class="fas fa-magic"></i> Explain Simply
+                        </button>
+                    </div>
+                </div>
+                {% elif user_role != 'admin' %}
+                <p style="color: var(--text-muted); font-style: italic; font-size: 14px;">No official response from the department yet.</p>
+                {% endif %}
+
+                {% if user_role == 'admin' %}
+                <div style="background: rgba(255, 255, 255, 0.03); padding: 20px; border-radius: var(--radius-md); border: 1px dashed var(--border);">
+                    <form action="/admin/respond/{{ complaint.id }}" method="POST">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                            <label style="font-size: 13px; color: var(--text-secondary);">
+                                {% if complaint.official_response %}Edit Response{% else %}Post Official Response{% endif %} (Admins Only)
+                            </label>
+                            <button type="button" id="aiDraftBtn" onclick="generateAIDraft({{ complaint.id }})" class="btn btn-outline btn-sm" style="font-size: 11px; padding: 4px 8px; color: #a855f7; border-color: rgba(168, 85, 247, 0.3);">
+                                <i class="fas fa-magic"></i> Auto-Draft with AI
+                            </button>
+                        </div>
+                        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 8px;">Tip: Type your short notes (e.g., "fixed pipe yesterday") and click "Auto-Draft with AI" to generate a formal response.</p>
+                        <textarea name="official_response" id="official_response_textarea" placeholder="Type the official status update or short notes here..." required rows="3"
+                            style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical; margin-bottom: 12px;">{{ complaint.official_response }}</textarea>
+                        <button type="submit" class="btn btn-info btn-sm">
+                            <i class="fas fa-save"></i> Save Official Response
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            <!-- AI Analysis -->
+            {% if complaint.ai_analysis %}
+            <div class="detail-section">
+                <h3>
+                    <i class="fas fa-robot" style="color: var(--accent);"></i> AI Analysis
+                    <span class="ai-badge"><i class="fas fa-sparkles"></i> Groq AI</span>
+                </h3>
+                <div class="ai-text" style="background: rgba(6, 182, 212, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(6, 182, 212, 0.1);">
+                    {{ complaint.ai_analysis }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- AI Suggestion -->
+            {% if complaint.ai_suggestion %}
+            <div class="detail-section">
+                <h3>
+                    <i class="fas fa-lightbulb" style="color: var(--warning);"></i> AI Resolution Suggestion
+                    <span class="ai-badge"><i class="fas fa-sparkles"></i> Groq AI</span>
+                </h3>
+                <div class="ai-text" style="background: rgba(245, 158, 11, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.1);">
+                    {{ complaint.ai_suggestion }}
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Deep AI Analysis Button -->
+            <div class="detail-section">
+                <button onclick="runDeepAnalysis({{ complaint.id }})" class="btn btn-outline" style="margin-bottom: 16px;" id="deepAnalyzeBtn">
+                    <i class="fas fa-brain"></i> Get Detailed AI Analysis
+                </button>
+                <div id="aiAnalysis" class="ai-text" style="background: rgba(99, 102, 241, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.1); display: none;"></div>
+            </div>
+
+            <!-- Actions -->
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                <button onclick="upvoteComplaint({{ complaint.id }}, this)" class="btn btn-outline btn-sm">
+                    <i class="fas fa-arrow-up"></i> Upvote <span class="upvote-count">{{ complaint.upvotes or 0 }}</span>
+                </button>
+                {% if complaint.status != 'Resolved' %}
+                <button id="amplifyBtn" onclick="generateCampaign({{ complaint.id }})" class="btn btn-primary btn-sm" style="background-color: #ec4899; border-color: #ec4899;">
+                    <i class="fas fa-bullhorn"></i> Amplify with AI
+                </button>
+                {% endif %}
+                {% if user_role == 'admin' and complaint.status != 'Resolved' %}
+                <form action="/resolve/{{ complaint.id }}" method="GET" style="display:inline-block;" onsubmit="return confirm('Ensure you have verified the resolution. Proceed?');">
+                    <button type="submit" class="btn btn-success btn-sm">
+                        <i class="fas fa-check"></i> Provide Proof & Resolve
+                    </button>
+                </form>
+                {% endif %}
+                {% if user_role == 'admin' %}
+                <a href="/delete/{{ complaint.id }}" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure?')">
+                    <i class="fas fa-trash"></i> Delete
+                </a>
+                {% endif %}
+            </div>
+
+            <!-- AI Campaign Kit Container -->
+            <div id="aiCampaignContainer" style="display: none; margin-top: 20px; padding: 20px; background: rgba(236, 72, 153, 0.05); border: 1px solid rgba(236, 72, 153, 0.2); border-radius: var(--radius-md);">
+                <h3 style="color: #ec4899; margin-bottom: 15px; font-size: 16px;"><i class="fas fa-share-alt"></i> Civic Action Campaign Kit</h3>
+                <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 15px;">Use these AI-generated templates to gather community support and escalate this issue to local authorities.</p>
+                
+                <div style="margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #25D366;"><i class="fab fa-whatsapp"></i> WhatsApp Community Forward</label>
+                        <button onclick="copyToClipboard('whatsappContent', this)" class="btn btn-outline btn-sm" style="padding: 2px 6px; font-size: 10px;">Copy</button>
+                    </div>
+                    <div id="whatsappContent" style="background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 4px; font-size: 13px; color: var(--text-primary); border: 1px solid rgba(37, 211, 102, 0.2);"></div>
+                </div>
+
+                <div style="margin-bottom: 12px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #1DA1F2;"><i class="fab fa-twitter"></i> Twitter/X Action Post</label>
+                        <button onclick="copyToClipboard('twitterContent', this)" class="btn btn-outline btn-sm" style="padding: 2px 6px; font-size: 10px;">Copy</button>
+                    </div>
+                    <div id="twitterContent" style="background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 4px; font-size: 13px; color: var(--text-primary); border: 1px solid rgba(29, 161, 242, 0.2);"></div>
+                </div>
+
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label style="font-size: 12px; font-weight: bold; color: #f59e0b;"><i class="fas fa-envelope"></i> Formal Email to Councilor</label>
+                        <button onclick="copyToClipboard('emailContent', this)" class="btn btn-outline btn-sm" style="padding: 2px 6px; font-size: 10px;">Copy</button>
+                    </div>
+                    <div id="emailContent" style="background: rgba(15, 23, 42, 0.6); padding: 10px; border-radius: 4px; font-size: 13px; color: var(--text-primary); border: 1px solid rgba(245, 158, 11, 0.2); white-space: pre-wrap;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Feedback Section -->
+    {% if complaint.status == 'Resolved' and logged_in %}
+    <div class="detail-card reveal" style="margin-top: 24px;">
+        <div class="detail-body">
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">
+                <i class="fas fa-star" style="color: var(--warning);"></i> Rate Resolution
+            </h3>
+            <form action="/feedback/{{ complaint.id }}" method="POST">
+                <div class="form-group">
+                    <label>Rating</label>
+                    <div style="display: flex; gap: 8px; margin-top: 8px;" id="starRating">
+                        {% for i in range(1, 6) %}
+                        <label style="cursor: pointer; font-size: 28px; transition: all 0.2s;">
+                            <input type="radio" name="rating" value="{{ i }}" style="display: none;" {% if i == 5 %}checked{% endif %}>
+                            <i class="fas fa-star" style="color: {% if i <= 5 %}var(--warning){% else %}var(--text-muted){% endif %};"></i>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Comment (optional)</label>
+                    <textarea name="comment" placeholder="How was the resolution? Any suggestions?" rows="2"
+                        style="width: 100%; padding: 12px 16px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical;"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="fas fa-paper-plane"></i> Submit Feedback
+                </button>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Existing Feedback -->
+    {% if feedbacks %}
+    <div class="detail-card reveal" style="margin-top: 24px;">
+        <div class="detail-body">
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">
+                <i class="fas fa-comments" style="color: var(--primary-light);"></i> Feedback ({{ feedbacks|length }})
+            </h3>
+            {% for fb in feedbacks %}
+            <div style="padding: 14px; background: rgba(15, 23, 42, 0.3); border-radius: var(--radius-sm); margin-bottom: 12px; border: 1px solid var(--border-light);">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    {% for i in range(fb.rating) %}
+                    <i class="fas fa-star" style="color: var(--warning); font-size: 14px;"></i>
+                    {% endfor %}
+                    {% for i in range(5 - fb.rating) %}
+                    <i class="fas fa-star" style="color: var(--text-muted); font-size: 14px;"></i>
+                    {% endfor %}
+                    <span style="color: var(--text-muted); font-size: 12px; margin-left: auto;">{{ fb.created_at[:10] if fb.created_at else '' }}</span>
+                </div>
+                {% if fb.comment %}
+                <p style="color: var(--text-secondary); font-size: 14px;">{{ fb.comment }}</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Fetch AI Prediction automatically
+    fetch('/api/predict-resolution/{{ complaint.id }}')
+    .then(r => r.json())
+    .then(data => {
+        if(data.estimated_time && !data.error) {
+            document.getElementById('predText').innerHTML = `Assigned to: <strong style="color: var(--text-primary);">${data.department}</strong>`;
+            document.getElementById('predStats').innerHTML = `
+                <div style="font-size: 18px; font-weight: 700; color: var(--success);">${data.estimated_time}</div>
+                <div style="font-size: 11px; color: var(--text-muted);"><i class="fas fa-shield-alt"></i> ${data.confidence}% Confidence</div>
+            `;
+        } else {
+            document.getElementById('predictionSection').style.display = 'none';
+        }
+    }).catch(e => { document.getElementById('predictionSection').style.display = 'none'; });
+
+    // Fetch AI Impact Score
+    fetch('/api/impact-score/{{ complaint.id }}')
+    .then(r => r.json())
+    .then(data => {
+        if(data.score !== undefined && !data.error) {
+            let color = 'var(--success)';
+            if(data.badge === 'Moderate') color = 'var(--warning)';
+            if(data.badge === 'Critical') color = 'var(--danger)';
+            
+            document.getElementById('impactText').innerHTML = `<strong>Reason:</strong> ${data.reason}`;
+            document.getElementById('impactStats').innerHTML = `
+                <div style="font-size: 24px; font-weight: 900; color: ${color}; text-shadow: 0 0 10px ${color}44;">${data.score}/100</div>
+                <div style="font-size: 11px; font-weight: 700; color: ${color}; text-transform: uppercase;">${data.badge}</div>
+            `;
+        } else {
+            document.getElementById('impactSection').style.display = 'none';
+        }
+    }).catch(e => { document.getElementById('impactSection').style.display = 'none'; });
+});
+
+function explainSimply() {
+    const btn = document.getElementById('btnExplain');
+    const textNode = document.getElementById('officialText');
+    const simpleNode = document.getElementById('simpleText');
+    
+    if (simpleNode.style.display === 'block') {
+        simpleNode.style.display = 'none';
+        btn.innerHTML = '<i class="fas fa-magic"></i> Explain Simply';
+        return;
+    }
+    
+    // Animate UI
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Translating...';
+    
+    fetch('/api/explain-simply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jargon: textNode.innerText })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if(data.simple) {
+            simpleNode.innerText = data.simple;
+            simpleNode.style.display = 'block';
+            btn.innerHTML = '<i class="fas fa-times"></i> Revert';
+        } else {
+            btn.innerHTML = '<i class="fas fa-magic"></i> Explain Simply';
+        }
+    }).catch(e => {
+        btn.innerHTML = '<i class="fas fa-magic"></i> Explain Simply';
+    });
+}
+
+function copyToClipboard(elementId, btn) {
+    const text = document.getElementById(elementId).innerText;
+    navigator.clipboard.writeText(text).then(() => {
+        const originalText = btn.innerText;
+        btn.innerText = "Copied!";
+        setTimeout(() => { btn.innerText = originalText; }, 2000);
+    });
+}
+
+function generateCampaign(complaintId) {
+    const btn = document.getElementById('amplifyBtn');
+    const container = document.getElementById('aiCampaignContainer');
+    
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Campaign...';
+    btn.disabled = true;
+
+    fetch(`/api/generate-campaign/${complaintId}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+                btn.innerHTML = originalContent;
+                btn.disabled = false;
+            } else {
+                document.getElementById('whatsappContent').innerText = data.whatsapp;
+                document.getElementById('twitterContent').innerText = data.twitter;
+                document.getElementById('emailContent').innerText = data.email;
+                container.style.display = 'block';
+                container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                btn.style.display = 'none'; // hide the button after generating
+            }
+        })
+        .catch(() => {
+            alert("Network error while generating campaign. Please try again.");
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+        });
+}
+
+function generateAIDraft(complaintId) {
+    const textarea = document.getElementById('official_response_textarea');
+    const btn = document.getElementById('aiDraftBtn');
+    const notes = textarea.value.trim();
+    
+    if (!notes) {
+        alert("Please enter some brief notes first to guide the AI.");
+        return;
+    }
+
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Drafting...';
+    btn.disabled = true;
+
+    fetch('/api/draft-response', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: notes, complaint_id: complaintId })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.draft) {
+            textarea.value = data.draft;
+        } else {
+            alert(data.error || "Failed to generate draft.");
+        }
+    })
+    .catch(() => alert("Network error. Please try again."))
+    .finally(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function runDeepAnalysis(id) {
+    const container = document.getElementById('aiAnalysis');
+    const btn = document.getElementById('deepAnalyzeBtn');
+    container.style.display = 'block';
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+    container.innerHTML = '<div class="ai-summary-loading"><div class="dot-pulse"><span></span><span></span><span></span></div> AI is performing deep analysis...</div>';
+
+    fetch(`/api/analyze/${id}`)
+        .then(res => res.json())
+        .then(data => {
+            container.innerHTML = data.analysis.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            btn.innerHTML = '<i class="fas fa-brain"></i> Analysis Complete';
+        })
+        .catch(() => {
+            container.innerHTML = 'Unable to analyze. Try again later.';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-brain"></i> Retry Analysis';
+        });
+}
+</script>
+{% endblock %}

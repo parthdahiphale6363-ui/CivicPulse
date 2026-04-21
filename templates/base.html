@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Smart Local Problem Reporting System - Report local issues like potholes, garbage, water leakage and track their resolution.">
+    <title>{% block title %}Smart Local Problem Reporting System{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+    <!-- Page Loader -->
+    <div class="page-loader" id="pageLoader">
+        <div class="loader-content">
+            <div class="loader-icon">
+                <div class="loader-ring"></div>
+                <div class="loader-ring"></div>
+                <div class="loader-ring"></div>
+                <i class="fas fa-city"></i>
+            </div>
+            <h2 class="loader-title">CivicPulse</h2>
+            <p class="loader-subtitle">Smart Local Problem Reporting</p>
+            <div class="loader-bar">
+                <div class="loader-bar-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-container">
+            <a href="/" class="nav-logo">
+                <i class="fas fa-city"></i>
+                <span>CivicPulse</span>
+            </a>
+
+            <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+                <span></span><span></span><span></span>
+            </button>
+
+            <div class="nav-menu" id="navMenu">
+                <a href="/" class="nav-link"><i class="fas fa-home"></i> Home</a>
+                <a href="/report" class="nav-link"><i class="fas fa-exclamation-triangle"></i> Report</a>
+                <a href="/complaints" class="nav-link"><i class="fas fa-list-alt"></i> Complaints</a>
+                <a href="/community" class="nav-link"><i class="fas fa-users"></i> Community</a>
+                <a href="/live-pulse" class="nav-link"><i class="fas fa-heartbeat"></i> Live Pulse</a>
+                <a href="/ai-chat" class="nav-link nav-link-ai"><i class="fas fa-robot"></i> AI Assistant</a>
+
+                {% if session.get('user_id') %}
+                    {% if session.get('role') == 'admin' %}
+                        <a href="/dashboard" class="nav-link"><i class="fas fa-chart-bar"></i> Dashboard</a>
+                    {% endif %}
+                    
+                    <div style="display:flex; align-items:center; gap:8px; margin: 0 10px;">
+                        {% if g_streak_days %}
+                            <span title="Reporting Streak" style="color:var(--warning); font-size:14px; font-weight: 700; background:rgba(245,158,11,0.1); padding:4px 8px; border-radius:10px; border:1px solid rgba(245,158,11,0.2);">
+                                🔥 {{ g_streak_days }}
+                            </span>
+                        {% endif %}
+                        <span title="Trust Score" style="color:var(--primary-light); font-size:14px; font-weight: 700; background:rgba(192,38,211,0.1); padding:4px 8px; border-radius:10px; border:1px solid rgba(192,38,211,0.2);">
+                            <i class="fas fa-star"></i> {{ g_trust_score|default(100) }}
+                        </span>
+                    </div>
+
+                    <a href="/logout" class="nav-link nav-link-logout"><i class="fas fa-sign-out-alt"></i> Logout</a>
+                {% else %}
+                    <a href="/login" class="nav-link btn-nav-login"><i class="fas fa-sign-in-alt"></i> Login</a>
+                    <a href="/register" class="nav-link btn-nav-register"><i class="fas fa-user-plus"></i> Register</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="flash-container">
+                {% for category, message in messages %}
+                    <div class="flash-message flash-{{ category }}" onclick="this.remove()">
+                        <i class="fas {% if category == 'success' %}fa-check-circle{% elif category == 'danger' %}fa-exclamation-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %}"></i>
+                        <span>{{ message }}</span>
+                        <i class="fas fa-times flash-close"></i>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- Page Content -->
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Floating AI Chat Button -->
+    <div class="ai-fab" id="aiFab" onclick="window.location.href='/ai-chat'">
+        <i class="fas fa-robot"></i>
+        <span class="ai-fab-tooltip">Ask CivicAI</span>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="footer-content">
+            <div class="footer-grid">
+                <div class="footer-section">
+                    <h3><i class="fas fa-city"></i> CivicPulse</h3>
+                    <p>Making your city better, one report at a time. Powered by AI for smarter civic engagement.</p>
+                </div>
+                <div class="footer-section">
+                    <h4>Quick Links</h4>
+                    <a href="/"><i class="fas fa-chevron-right"></i> Home</a>
+                    <a href="/report"><i class="fas fa-chevron-right"></i> Report Problem</a>
+                    <a href="/complaints"><i class="fas fa-chevron-right"></i> View Complaints</a>
+                    <a href="/community"><i class="fas fa-chevron-right"></i> Community Board</a>
+                    <a href="/ai-chat"><i class="fas fa-chevron-right"></i> AI Assistant</a>
+                </div>
+                <div class="footer-section">
+                    <h4>Departments</h4>
+                    <a href="#"><i class="fas fa-road"></i> Roads</a>
+                    <a href="#"><i class="fas fa-trash"></i> Sanitation</a>
+                    <a href="#"><i class="fas fa-tint"></i> Water</a>
+                    <a href="#"><i class="fas fa-bolt"></i> Electricity</a>
+                </div>
+                <div class="footer-section">
+                    <h4>Emergency</h4>
+                    <p><i class="fas fa-phone"></i> Emergency: 112</p>
+                    <p><i class="fas fa-fire-extinguisher"></i> Fire: 101</p>
+                    <p><i class="fas fa-ambulance"></i> Ambulance: 108</p>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; {{ current_year }} CivicPulse — Smart Local Problem Reporting System. Built with <i class="fas fa-heart" style="color: #ef4444;"></i> &amp; AI</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

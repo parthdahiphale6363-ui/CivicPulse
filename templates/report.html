@@ -1,0 +1,391 @@
+{% extends "base.html" %}
+{% block title %}Report Problem — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card wide">
+        <div class="form-header">
+            <div class="form-header-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h2>Report a Problem</h2>
+            <p>Describe the issue and our AI will analyze it for smart prioritization</p>
+        </div>
+
+        <form action="/report" method="POST" id="reportForm" enctype="multipart/form-data">
+            <div class="form-group">
+                <label><i class="fas fa-tag"></i> Category</label>
+                <select name="category" id="categorySelect" required>
+                    <option value="" disabled selected>Select a category</option>
+                    <option value="Pothole">🕳️ Pothole</option>
+                    <option value="Garbage">🗑️ Garbage / Waste</option>
+                    <option value="Water Leakage">💧 Water Leakage</option>
+                    <option value="Streetlight">💡 Streetlight Issue</option>
+                    <option value="Sewage">🚰 Sewage / Drainage</option>
+                    <option value="Road Damage">🛣️ Road Damage</option>
+                    <option value="Traffic Signal">🚦 Traffic Signal</option>
+                    <option value="Noise Pollution">🔊 Noise Pollution</option>
+                    <option value="Illegal Dumping">⚠️ Illegal Dumping</option>
+                    <option value="Other">📝 Other</option>
+                </select>
+            </div>
+
+            <!-- Description with AI Enhance -->
+            <div class="form-group">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <label><i class="fas fa-align-left"></i> Description</label>
+                    <button type="button" class="btn-ai-enhance" id="enhanceDescBtn" onclick="enhanceDescription()">
+                        <i class="fas fa-magic"></i> AI Enhance
+                    </button>
+                </div>
+                <textarea name="description" id="descriptionInput" placeholder="Describe the problem in detail. The more details, the better our AI can analyze it..." required rows="4"></textarea>
+                <div class="ai-enhance-status" id="descEnhanceStatus"></div>
+            </div>
+
+            <!-- MULTIMEDIA EVIDENCE -->
+            <div class="multimedia-section" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 25px;">
+                <div class="upload-box" style="background: rgba(255, 255, 255, 0.05); border: 2px dashed rgba(99, 102, 241, 0.3); border-radius: var(--radius-md); padding: 20px; text-align: center; transition: all 0.3s ease;">
+                    <label style="cursor: pointer; display: block;">
+                        <input type="file" name="image" accept="image/*" style="display: none;" onchange="previewMedia(this, 'img-preview')">
+                        <i class="fas fa-camera" style="font-size: 28px; color: var(--primary-light); margin-bottom: 10px;"></i>
+                        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">Add Photo</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Visual proof for AI</div>
+                    </label>
+                    <div id="img-preview" style="margin-top: 15px; display: none;">
+                        <img src="" style="width: 100%; border-radius: 8px; border: 2px solid var(--primary);">
+                    </div>
+                </div>
+
+                <div class="upload-box" style="background: rgba(255, 255, 255, 0.05); border: 2px dashed rgba(6, 182, 212, 0.3); border-radius: var(--radius-md); padding: 20px; text-align: center; transition: all 0.3s ease;">
+                    <label style="cursor: pointer; display: block;">
+                        <input type="file" name="video" accept="video/*" style="display: none;" onchange="validateVideo(this)">
+                        <i class="fas fa-video" style="font-size: 28px; color: var(--accent); margin-bottom: 10px;"></i>
+                        <div style="font-size: 14px; font-weight: 600; color: var(--text-primary);">Add Video</div>
+                        <div style="font-size: 11px; color: var(--text-muted);">Strictly max 15s</div>
+                    </label>
+                    <div id="vid-preview" style="margin-top: 15px; display: none;">
+                        <video src="" style="width: 100%; border-radius: 8px; border: 2px solid var(--accent);" controls></video>
+                    </div>
+                    <div id="videoError" style="font-size: 11px; color: var(--danger); margin-top: 8px; font-weight: 500;"></div>
+                </div>
+            </div>
+
+            <!-- Location with AI Enhance -->
+            <div class="form-group">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                    <label><i class="fas fa-map-marker-alt"></i> Location</label>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn btn-sm btn-info" onclick="getCurrentLocation()" id="gpsBtn" 
+                            style="background: rgba(59, 130, 246, 0.1); border: 1px solid var(--info); color: var(--info); padding: 4px 10px; font-size: 11px;">
+                            <i class="fas fa-crosshairs"></i> 📍 Use GPS
+                        </button>
+                        <button type="button" class="btn-ai-enhance" id="enhanceLocBtn" onclick="enhanceLocation()">
+                            <i class="fas fa-magic"></i> AI Enhance
+                        </button>
+                    </div>
+                </div>
+                <input type="text" name="location" id="locationInput" placeholder="Enter the location (e.g., Main Road near City Mall)">
+                <input type="hidden" name="latitude" id="latitudeInput" value="">
+                <input type="hidden" name="longitude" id="longitudeInput" value="">
+                <div class="ai-enhance-status" id="locEnhanceStatus" style="font-size: 11px; margin-top: 4px;"></div>
+                
+                <!-- Duplicate Detection Warning -->
+                <div id="duplicateWarning" style="display: none; margin-top: 10px; padding: 12px; background: rgba(245, 158, 11, 0.1); border: 1px solid var(--warning); border-radius: var(--radius-md); color: var(--text-primary); font-size: 0.9rem;">
+                </div>
+            </div>
+
+            <!-- EMERGENCY / SOS TOGGLE -->
+            <div class="form-group" style="background: rgba(239, 68, 68, 0.05); padding: 20px; border-radius: var(--radius-md); border: 2px solid rgba(239, 68, 68, 0.2); margin-top: 25px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h4 style="color: var(--danger); font-size: 15px; margin-bottom: 4px;"><i class="fas fa-biohazard fa-spin" style="margin-right: 8px;"></i> SOS / Immediate Danger</h4>
+                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">Toggle this ONLY for life-threatening issues (Live wires, Gas leaks, Major water floods). AI will prioritize this report immediately.</p>
+                    </div>
+                    <label class="switch" style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                        <input type="checkbox" name="is_emergency" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; border-radius: 34px;"></span>
+                    </label>
+                </div>
+            </div>
+
+<style>
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--danger); box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+input:checked + .slider:before { transform: translateX(24px); }
+</style>
+
+<script>
+function getCurrentLocation() {
+    const btn = document.getElementById('gpsBtn');
+    const status = document.getElementById('locEnhanceStatus');
+    const input = document.getElementById('locationInput');
+
+    if (!navigator.geolocation) {
+        status.innerHTML = '<span style="color: var(--danger);">GPS not supported by browser</span>';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Locating...';
+    status.innerHTML = '<span style="color: var(--info);">Accessing satellite data...</span>';
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+            document.getElementById('latitudeInput').value = lat;
+            document.getElementById('longitudeInput').value = lon;
+            status.innerHTML = `<span style="color: var(--accent);">Found: ${lat.toFixed(4)}, ${lon.toFixed(4)}. Fetching address...</span>`;
+
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.display_name) {
+                        input.value = data.display_name;
+                        status.innerHTML = '<span style="color: var(--success);"><i class="fas fa-check"></i> Address updated!</span>';
+                    } else {
+                        input.value = `${lat}, ${lon}`;
+                        status.innerHTML = '<span style="color: var(--warning);">Using coordinates (address not found).</span>';
+                    }
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 Use GPS';
+                    checkDuplicates(lat, lon); // Smart Merge Check
+                })
+                .catch(() => {
+                    input.value = `${lat}, ${lon}`;
+                    status.innerHTML = '<span style="color: var(--warning);">Network error fetching address. Using raw coords.</span>';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 Use GPS';
+                });
+        },
+        (error) => {
+            status.innerHTML = '<span style="color: var(--danger);">GPS Access Denied. Please enable location permissions.</span>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 Use GPS';
+        }
+    );
+}
+</script>
+
+            <!-- Priority Preview -->
+            <div id="priorityPreview" style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: var(--radius-md); padding: 14px; margin-bottom: 20px; display: none;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                    <i class="fas fa-flag" style="color: var(--primary-light);"></i>
+                    <strong style="font-size: 13px; color: var(--text-secondary);">Estimated Priority:</strong>
+                    <span id="priorityBadge" class="priority-badge"></span>
+                </div>
+                <p style="color: var(--text-muted); font-size: 12px;">This is auto-assigned based on category. AI may adjust it after analysis.</p>
+            </div>
+
+            <div style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.15); border-radius: var(--radius-md); padding: 14px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
+                <i class="fas fa-robot" style="color: var(--accent); font-size: 18px;"></i>
+                <span style="color: var(--text-secondary); font-size: 13px;">
+                    <strong style="color: var(--accent);">AI Powered:</strong> Use the ✨ AI Enhance buttons to improve your description and location with AI. Your complaint will also be automatically analyzed for priority and resolution.
+                </span>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;" id="submitBtn">
+                <i class="fas fa-paper-plane"></i> Submit Complaint
+            </button>
+        </form>
+
+        <div class="form-footer">
+            <a href="/"><i class="fas fa-arrow-left"></i> Back to Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Priority preview based on category
+const priorityMap = {
+    'Pothole': 'High', 'Garbage': 'Medium', 'Water Leakage': 'High',
+    'Streetlight': 'Medium', 'Sewage': 'High', 'Noise Pollution': 'Low',
+    'Illegal Dumping': 'Medium', 'Road Damage': 'High', 'Traffic Signal': 'High', 'Other': 'Low'
+};
+
+document.getElementById('categorySelect').addEventListener('change', function() {
+    const priority = priorityMap[this.value] || 'Low';
+    const preview = document.getElementById('priorityPreview');
+    const badge = document.getElementById('priorityBadge');
+    preview.style.display = 'block';
+    badge.textContent = priority;
+    badge.className = 'priority-badge priority-' + priority.toLowerCase();
+});
+
+// AI Enhance Description
+function enhanceDescription() {
+    const desc = document.getElementById('descriptionInput').value.trim();
+    const btn = document.getElementById('enhanceDescBtn');
+    const status = document.getElementById('descEnhanceStatus');
+
+    if (!desc) {
+        status.innerHTML = '<span style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> Please write a description first.</span>';
+        setTimeout(() => status.innerHTML = '', 3000);
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
+    status.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-robot"></i> AI Smart Analyzer is processing...</span>';
+
+    fetch('/api/analyze-draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: desc })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.official_description && !data.error) {
+            document.getElementById('descriptionInput').value = data.official_description;
+            
+            if (data.category && document.getElementById('categorySelect').value === "") {
+                const select = document.getElementById('categorySelect');
+                for(let i=0; i<select.options.length; i++) {
+                    if(select.options[i].value.includes(data.category)) {
+                        select.selectedIndex = i;
+                        // trigger change event
+                        const event = new Event('change');
+                        select.dispatchEvent(event);
+                        break;
+                    }
+                }
+            }
+
+            let msg = `<span style="color: var(--success);"><i class="fas fa-check-circle"></i> Cleaned & optimized. Severity: ${data.severity_score}/10!</span>`;
+            if (data.missing_details && data.missing_details.toLowerCase() !== "none") {
+                msg += `<br><span style="color: var(--warning); margin-top:5px; display:inline-block;"><i class="fas fa-info-circle"></i> <b>AI Suggests:</b> ${data.missing_details}</span>`;
+            }
+            status.innerHTML = msg;
+        } else {
+            status.innerHTML = '<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> ' + (data.error || 'Could not analyze.') + '</span>';
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> AI Analyze';
+    })
+    .catch(() => {
+        status.innerHTML = '<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> Check failed. Try again.</span>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> AI Analyze';
+    });
+}
+
+// AI Enhance Location
+function enhanceLocation() {
+    // ...
+    const loc = document.getElementById('locationInput').value.trim();
+    const btn = document.getElementById('enhanceLocBtn');
+    const status = document.getElementById('locEnhanceStatus');
+
+    if (!loc) {
+        status.innerHTML = '<span style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> Please enter a location first.</span>';
+        setTimeout(() => status.innerHTML = '', 3000);
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refine...';
+    status.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-robot"></i> AI hyper-accurate engine running...</span>';
+
+    fetch('/api/enhance-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location: loc })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.refined_address && !data.error) {
+            document.getElementById('locationInput').value = data.refined_address;
+            let msg = '<span style="color: var(--success);"><i class="fas fa-check-circle"></i> Location refined! (Conf: '+data.confidence_score+'%)</span>';
+            if(data.nearby_landmarks && data.nearby_landmarks.length > 0) {
+                msg += '<br><span style="color: var(--info); display:inline-block; margin-top:5px;"><i class="fas fa-map-pin"></i> <b>Landmarks:</b> ' + data.nearby_landmarks.join(', ') + '</span>';
+            }
+            status.innerHTML = msg;
+        } else {
+            status.innerHTML = '<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> ' + (data.error || 'Could not refine.') + '</span>';
+        }
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> AI Enhance';
+    })
+    .catch(() => {
+        status.innerHTML = '<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> Enhancement failed. Try again.</span>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-magic"></i> AI Enhance';
+    });
+}
+
+function checkDuplicates(lat, lon) {
+    if (!lat || !lon) return;
+    fetch('/api/nearby-duplicates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ latitude: lat, longitude: lon })
+    }).then(res => res.json()).then(data => {
+        const dupDiv = document.getElementById('duplicateWarning');
+        if (data.length > 0) {
+            dupDiv.style.display = 'block';
+            let html = '<h5 style="margin-bottom: 8px; color: var(--warning);"><i class="fas fa-copy"></i> Similar Reports Nearby</h5>';
+            html += '<p style="margin-bottom: 8px; font-size: 13px;">Consider upvoting instead of creating a duplicate to boost urgency!</p>';
+            html += '<ul style="padding-left: 20px; font-size: 13px; margin-bottom: 0;">';
+            data.forEach(d => {
+                html += `<li style="margin-bottom: 4px;"><a href="/complaint/${d.id}" target="_blank" style="color: var(--info); text-decoration: underline;">#${d.id} - ${d.category}</a> (${d.distance_m}m away - ${d.status})</li>`;
+            });
+            html += '</ul>';
+            dupDiv.innerHTML = html;
+        } else {
+            dupDiv.style.display = 'none';
+        }
+    }).catch(e => console.error(e));
+}
+
+// MULTIMEDIA PREVIEW & VALIDATION
+function previewMedia(input, previewId) {
+    const previewDiv = document.getElementById(previewId);
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            previewDiv.style.display = 'block';
+            if (previewId === 'img-preview') {
+                previewDiv.querySelector('img').src = e.target.result;
+            } else {
+                previewDiv.querySelector('video').src = e.target.result;
+            }
+        }
+        reader.readAsDataURL(file);
+    }
+}
+
+function validateVideo(input) {
+    const error = document.getElementById('videoError');
+    const previewDiv = document.getElementById('vid-preview');
+    error.innerText = "";
+    
+    if (input.files && input.files[0]) {
+        const file = input.files[0];
+        if (file.size > 20 * 1024 * 1024) { // 20MB limit
+            error.innerText = "❌ File too large (Max 20MB)";
+            input.value = "";
+            previewDiv.style.display = 'none';
+            return;
+        }
+
+        const video = document.createElement('video');
+        video.preload = 'metadata';
+        video.onloadedmetadata = function() {
+            window.URL.revokeObjectURL(video.src);
+            if (video.duration > 15.5) {
+                error.innerText = "❌ Video must be 15 seconds or less.";
+                input.value = "";
+                previewDiv.style.display = 'none';
+            } else {
+                previewMedia(input, 'vid-preview');
+            }
+        }
+        video.src = URL.createObjectURL(file);
+    }
+}
+</script>
+{% endblock %}

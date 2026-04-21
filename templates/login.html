@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Login — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <div class="form-header">
+            <div class="form-header-icon">
+                <i class="fas fa-sign-in-alt"></i>
+            </div>
+            <h2>Welcome Back</h2>
+            <p>Login to report problems & track your complaints</p>
+        </div>
+
+        <form action="/login" method="POST">
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Username</label>
+                <input type="text" name="username" placeholder="Enter your username" required autocomplete="username">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-lock"></i> Password</label>
+                <input type="password" name="password" placeholder="Enter your password" required autocomplete="current-password">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;">
+                <i class="fas fa-sign-in-alt"></i> Login
+            </button>
+        </form>
+
+        <div class="form-footer">
+            <p>Don't have an account? <a href="/register">Register here</a></p>
+        </div>
+    </div>
+</div>
+{% endblock %}

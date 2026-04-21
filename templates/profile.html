@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}My Profile — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="profile-page">
+    <div class="profile-header reveal">
+        <div class="profile-avatar">
+            <i class="fas fa-user"></i>
+        </div>
+        <h2>{{ username }}</h2>
+        <p style="color: var(--text-secondary);">Welcome to your profile</p>
+        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+            <div
+                style="background: rgba(99,102,241,0.1); padding: 8px 16px; border-radius: var(--radius-full); font-size: 13px;">
+                <i class="fas fa-clipboard-list" style="color: var(--primary-light);"></i>
+                {{ total_filed }} Complaints Filed
+            </div>
+            <div
+                style="background: rgba(16,185,129,0.1); padding: 8px 16px; border-radius: var(--radius-full); font-size: 13px;">
+                <i class="fas fa-check-circle" style="color: var(--success);"></i>
+                {{ total_resolved }} Resolved
+            </div>
+            <div
+                style="background: rgba(245,158,11,0.1); padding: 8px 16px; border-radius: var(--radius-full); font-size: 13px;">
+                <i class="fas fa-clock" style="color: var(--warning);"></i>
+                {{ total_pending }} Pending
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-bottom: 24px;" class="reveal">
+        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 16px;">
+            <i class="fas fa-history" style="color: var(--primary-light);"></i> My Complaints
+        </h3>
+    </div>
+
+    {% if user_complaints %}
+    <div class="complaint-list">
+        {% for c in user_complaints %}
+        <a href="/complaint/{{ c.id }}" class="complaint-item reveal" style="text-decoration: none; color: inherit;">
+            <span
+                class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
+                {{ c.category or 'Other' }}
+            </span>
+            <div class="complaint-info">
+                <h4>{{ c.description[:80] }}{% if c.description|length > 80 %}...{% endif %}</h4>
+                <p>{{ c.created_at or 'Recently' }} {% if c.location %}· {{ c.location }}{% endif %}</p>
+            </div>
+            <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+            <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state reveal">
+        <i class="fas fa-inbox"></i>
+        <h3>No Complaints Yet</h3>
+        <p>You haven't filed any complaints yet. Start by reporting a problem!</p>
+        <a href="/report" class="btn btn-primary" style="margin-top: 20px;">
+            <i class="fas fa-plus"></i> Report a Problem
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Complaints — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="complaints-page">
+    <div class="complaints-header">
+        <div>
+            <h1 style="font-size: 28px; font-weight: 800; margin-bottom: 4px;">
+                <i class="fas fa-list-alt" style="color: var(--primary-light);"></i> All Complaints
+            </h1>
+            <p style="color: var(--text-secondary); font-size: 14px;">Browse and manage all reported civic issues</p>
+        </div>
+
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+            {% if user_role == 'admin' %}
+            <a href="/export/csv" class="btn btn-outline btn-sm">
+                <i class="fas fa-download"></i> Export CSV
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Search Bar -->
+    <div class="search-bar-wrap reveal" style="margin-bottom: 24px;">
+        <form method="GET" action="/complaints" class="search-form" style="display: flex; gap: 12px; flex-wrap: wrap;">
+            <div style="flex: 1; min-width: 250px; position: relative;">
+                <i class="fas fa-search" style="position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                <input type="text" name="search" value="{{ search_query }}" placeholder="Search complaints by description, location, or category..."
+                       style="width: 100%; padding: 12px 16px 12px 40px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; outline: none; transition: var(--transition);">
+            </div>
+            <select name="status" style="padding: 12px 16px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; cursor: pointer; min-width: 140px;">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Status</option>
+                <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>⏳ Pending</option>
+                <option value="Resolved" {% if status_filter == 'Resolved' %}selected{% endif %}>✅ Resolved</option>
+            </select>
+            <select name="category" style="padding: 12px 16px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; cursor: pointer; min-width: 160px;">
+                <option value="all" {% if category_filter == 'all' %}selected{% endif %}>All Categories</option>
+                <option value="Pothole" {% if category_filter == 'Pothole' %}selected{% endif %}>Pothole</option>
+                <option value="Garbage" {% if category_filter == 'Garbage' %}selected{% endif %}>Garbage</option>
+                <option value="Water Leakage" {% if category_filter == 'Water Leakage' %}selected{% endif %}>Water Leakage</option>
+                <option value="Streetlight" {% if category_filter == 'Streetlight' %}selected{% endif %}>Streetlight</option>
+                <option value="Sewage" {% if category_filter == 'Sewage' %}selected{% endif %}>Sewage</option>
+                <option value="Road Damage" {% if category_filter == 'Road Damage' %}selected{% endif %}>Road Damage</option>
+                <option value="Traffic Signal" {% if category_filter == 'Traffic Signal' %}selected{% endif %}>Traffic Signal</option>
+                <option value="Other" {% if category_filter == 'Other' %}selected{% endif %}>Other</option>
+            </select>
+            <button type="submit" class="btn btn-primary btn-sm">
+                <i class="fas fa-filter"></i> Filter
+            </button>
+            {% if search_query or status_filter != 'all' or category_filter != 'all' %}
+            <a href="/complaints" class="btn btn-outline btn-sm">
+                <i class="fas fa-times"></i> Clear
+            </a>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Quick Filters -->
+    <div class="complaints-filters" style="margin-bottom: 20px;">
+        <a href="/complaints" class="filter-btn {% if status_filter == 'all' and category_filter == 'all' and not search_query %}active{% endif %}">All</a>
+        <a href="/complaints?status=Pending" class="filter-btn {% if status_filter == 'Pending' %}active{% endif %}">
+            <i class="fas fa-clock"></i> Pending
+        </a>
+        <a href="/complaints?status=Resolved" class="filter-btn {% if status_filter == 'Resolved' %}active{% endif %}">
+            <i class="fas fa-check"></i> Resolved
+        </a>
+        <a href="/complaints?category=Pothole" class="filter-btn {% if category_filter == 'Pothole' %}active{% endif %}">🕳️ Pothole</a>
+        <a href="/complaints?category=Garbage" class="filter-btn {% if category_filter == 'Garbage' %}active{% endif %}">🗑️ Garbage</a>
+        <a href="/complaints?category=Water Leakage" class="filter-btn {% if category_filter == 'Water Leakage' %}active{% endif %}">💧 Water</a>
+        <a href="/complaints?category=Streetlight" class="filter-btn {% if category_filter == 'Streetlight' %}active{% endif %}">💡 Streetlight</a>
+    </div>
+
+    {% if search_query %}
+    <div style="margin-bottom: 16px; padding: 10px 16px; background: rgba(99, 102, 241, 0.05); border-radius: var(--radius-sm); border: 1px solid rgba(99, 102, 241, 0.15);">
+        <span style="color: var(--text-secondary); font-size: 13px;">
+            <i class="fas fa-search"></i> Showing results for "<strong style="color: var(--primary-light);">{{ search_query }}</strong>"
+            — {{ complaints|length }} result(s) found
+        </span>
+    </div>
+    {% endif %}
+
+    {% if complaints %}
+    <div class="complaints-table-wrap reveal">
+        <table class="complaints-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Location</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Date</th>
+                    <th><i class="fas fa-arrow-up"></i></th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in complaints %}
+                <tr>
+                    <td><strong>#{{ c.id }}</strong></td>
+                    <td>
+                        <span class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
+                            {{ c.category or 'Other' }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="/complaint/{{ c.id }}" style="color: var(--text-primary); text-decoration: none;">
+                            <span class="complaint-desc">{{ c.description }}</span>
+                        </a>
+                    </td>
+                    <td style="color: var(--text-secondary); font-size: 13px;">
+                        {% if c.location %}{{ c.location[:30] }}{% if c.location|length > 30 %}...{% endif %}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
+                    </td>
+                    <td>
+                        <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+                    </td>
+                    <td>
+                        <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+                    </td>
+                    <td style="color: var(--text-secondary); font-size: 13px; white-space: nowrap;">
+                        {{ c.created_at[:10] if c.created_at else '—' }}
+                    </td>
+                    <td>
+                        <span style="color: var(--primary-light); font-size: 13px;">{{ c.upvotes or 0 }}</span>
+                    </td>
+                    <td>
+                        <div class="actions">
+                            <a href="/complaint/{{ c.id }}" class="btn btn-sm btn-outline" title="View Details">
+                                <i class="fas fa-eye"></i>
+                            </a>
+                            {% if user_role == 'admin' and c.status != 'Resolved' %}
+                            <a href="/resolve/{{ c.id }}" class="btn btn-sm btn-success" title="Resolve">
+                                <i class="fas fa-check"></i>
+                            </a>
+                            {% endif %}
+                            {% if user_role == 'admin' %}
+                            <a href="/delete/{{ c.id }}" class="btn btn-sm btn-danger" title="Delete" onclick="return confirm('Are you sure?')">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="empty-state reveal">
+        <i class="fas fa-inbox"></i>
+        <h3>No Complaints Found</h3>
+        <p>No complaints match your current filter. Try a different filter or report a new problem.</p>
+        <a href="/report" class="btn btn-primary" style="margin-top: 20px;">
+            <i class="fas fa-plus"></i> Report Problem
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

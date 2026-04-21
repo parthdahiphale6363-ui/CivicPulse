@@ -1,0 +1,102 @@
+/* Reset */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Body */
+body {
+    font-family: 'Segoe UI', sans-serif;
+    height: 100vh;
+    background: linear-gradient(to right, #dbeafe, #f0f9ff);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Form Container */
+.container {
+    width: 550px;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0px 8px 25px rgba(0,0,0,0.1);
+}
+
+/* Heading */
+.container h2 {
+    text-align: center;
+    margin-bottom: 25px;
+    color: #1e3a8a;
+}
+
+/* Labels */
+label {
+    font-size: 14px;
+    font-weight: 600;
+}
+
+/* Inputs */
+input, textarea, select {
+    width: 100%;
+    padding: 10px;
+    margin-top: 6px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+}
+
+/* Textarea */
+textarea {
+    height: 100px;
+    resize: none;
+}
+
+/* Button */
+button {
+    width:100% ;
+    padding: 12px;
+    background:#25415e;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+/* Hover */
+button:hover {
+    background: #1e40af;
+}
+
+/* Footer text (optional) */
+.footer {
+    text-align: center;
+    margin-top: 30px;
+    font-size: 20px;
+    color: gray;
+}
+.back-btn {
+    position:absolute;
+    top: 70px;
+    background: #25415e;
+    color: white;
+    padding: 12px 20px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 20px;
+}
+
+/* Hover effect */
+.back-btn:hover {
+    background: #1e40af;
+}
+
+/* Heading spacing (important) */
+.container h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    margin-top: 10px;
+}

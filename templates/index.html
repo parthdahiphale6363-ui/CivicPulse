@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% block title %}CivicPulse — Smart Local Problem Reporting System{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+    <div class="hero-particles">
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+        <div class="particle"></div>
+    </div>
+
+    <div class="hero-content">
+        <div class="hero-badge">
+            <i class="fas fa-bolt"></i>
+            AI-Powered Civic Engagement Platform
+        </div>
+
+        <h1 class="hero-title">
+            Report Local Problems<br>
+            <span class="gradient-text">Get Them Solved Faster</span>
+        </h1>
+
+        <p class="hero-subtitle">
+            Empowering citizens to report issues like potholes, garbage, water leakage & more.
+            Track complaint status in real-time with AI-powered analysis and smart prioritization.
+        </p>
+
+        <div class="hero-actions">
+            <a href="/report" class="btn btn-primary">
+                <i class="fas fa-exclamation-triangle"></i> Report a Problem
+            </a>
+            <a href="/complaints" class="btn btn-outline">
+                <i class="fas fa-list-alt"></i> View Complaints
+            </a>
+            <a href="/ai-chat" class="btn btn-outline">
+                <i class="fas fa-robot"></i> Ask CivicAI
+            </a>
+        </div>
+    </div>
+</section>
+
+<!-- Live Stats Section -->
+<section class="stats-section">
+    <div class="section-container">
+        <div class="section-header reveal">
+            <div class="section-badge"><i class="fas fa-chart-line"></i> Live Statistics</div>
+            <h2 class="section-title">Tracking Civic Progress</h2>
+            <p class="section-description">Real-time overview of reported issues and their resolution status</p>
+        </div>
+
+        <div class="stats-grid">
+            <div class="stat-card reveal reveal-delay-1">
+                <div class="stat-icon purple"><i class="fas fa-clipboard-list"></i></div>
+                <div class="stat-number">{{ total }}</div>
+                <div class="stat-label">Total Complaints</div>
+            </div>
+            <div class="stat-card reveal reveal-delay-2">
+                <div class="stat-icon green"><i class="fas fa-check-circle"></i></div>
+                <div class="stat-number">{{ resolved }}</div>
+                <div class="stat-label">Resolved</div>
+            </div>
+            <div class="stat-card reveal reveal-delay-3">
+                <div class="stat-icon yellow"><i class="fas fa-clock"></i></div>
+                <div class="stat-number">{{ pending }}</div>
+                <div class="stat-label">Pending</div>
+            </div>
+            <div class="stat-card reveal reveal-delay-4">
+                <div class="stat-icon blue"><i class="fas fa-robot"></i></div>
+                <div class="stat-number">{{ total }}</div>
+                <div class="stat-label">AI Analyzed</div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Departments Section -->
+<section class="departments-section">
+    <div class="section-container">
+        <div class="section-header reveal">
+            <div class="section-badge"><i class="fas fa-building"></i> Departments</div>
+            <h2 class="section-title">Municipal Departments</h2>
+            <p class="section-description">Your complaints are routed to the right department automatically</p>
+        </div>
+
+        <div class="dept-grid">
+            <div class="dept-card reveal reveal-delay-1">
+                <div class="dept-icon road"><i class="fas fa-road"></i></div>
+                <h3>Road Department</h3>
+                <p>Handles potholes, road damage, speed breakers, and road construction issues.</p>
+            </div>
+            <div class="dept-card reveal reveal-delay-2">
+                <div class="dept-icon sanitation"><i class="fas fa-trash-alt"></i></div>
+                <h3>Sanitation Department</h3>
+                <p>Manages garbage collection, waste management, and illegal dumping complaints.</p>
+            </div>
+            <div class="dept-card reveal reveal-delay-3">
+                <div class="dept-icon water"><i class="fas fa-tint"></i></div>
+                <h3>Water Department</h3>
+                <p>Addresses water leakage, supply disruptions, and water quality concerns.</p>
+            </div>
+            <div class="dept-card reveal reveal-delay-4">
+                <div class="dept-icon electricity"><i class="fas fa-bolt"></i></div>
+                <h3>Electricity Department</h3>
+                <p>Resolves streetlight failures, power outages, and electrical hazards.</p>
+            </div>
+            <div class="dept-card reveal reveal-delay-1">
+                <div class="dept-icon sewage"><i class="fas fa-water"></i></div>
+                <h3>Sewage Department</h3>
+                <p>Tackles sewage overflow, drainage blockage, and wastewater issues.</p>
+            </div>
+            <div class="dept-card reveal reveal-delay-2">
+                <div class="dept-icon traffic"><i class="fas fa-traffic-light"></i></div>
+                <h3>Traffic Department</h3>
+                <p>Manages traffic signal malfunctions, road signs, and congestion issues.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- AI Neighborhood Intelligence -->
+<section class="ai-hub-section" style="padding: 80px 0; background: rgba(15, 23, 42, 0.3);">
+    <div class="section-container">
+        <div class="section-header reveal" style="text-align: center;">
+            <div class="section-badge"><i class="fas fa-brain"></i> AI Intelligence</div>
+            <h2 class="section-title">Neighborhood Health Summary</h2>
+            <p class="section-description">How our community is doing today, analyzed by CivicAI</p>
+        </div>
+
+        <div class="ai-summary-card reveal" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-lg); padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); position: relative;">
+            <div id="aiHomeSummary" style="color: var(--text-primary); line-height: 1.8; min-height: 150px;">
+                <div style="text-align: center; padding: 40px;">
+                    <i class="fas fa-circle-notch fa-spin" style="font-size: 32px; color: var(--accent); margin-bottom: 20px;"></i>
+                    <p style="color: var(--text-secondary);">CivicAI is synthesizing recent reports into neighborhood insights...</p>
+                </div>
+            </div>
+            
+            <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 30px;">
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 36px; font-weight: 800; color: var(--success); margin-bottom: 5px;">{{ (resolved / (total or 1) * 100) | round(1) }}%</div>
+                    <div style="color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Resolved Efforts</div>
+                </div>
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 36px; font-weight: 800; color: var(--accent); margin-bottom: 5px;">{{ total }}</div>
+                    <div style="color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Total Reports</div>
+                </div>
+                <div style="text-align: center; padding: 20px;">
+                    <div style="font-size: 36px; font-weight: 800; color: var(--warning); margin-bottom: 5px;">{{ pending }}</div>
+                    <div style="color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">In Progress</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<script>
+async function loadHomeAISummary() {
+    const container = document.getElementById('aiHomeSummary');
+    try {
+        const response = await fetch('/api/dashboard-summary');
+        const data = await response.json();
+        if (data.summary) {
+            let html = data.summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            html = html.replace(/\n/g, '<br>');
+            container.innerHTML = `<div style="font-size: 15px; color: var(--text-primary);">${html}</div>`;
+        }
+    } catch (err) {
+        container.innerHTML = "Unable to load AI summary at this time.";
+    }
+}
+document.addEventListener('DOMContentLoaded', loadHomeAISummary);
+</script>
+
+<!-- How It Works -->
+<section class="how-section">
+    <div class="section-container">
+        <div class="section-header reveal">
+            <div class="section-badge"><i class="fas fa-cogs"></i> How It Works</div>
+            <h2 class="section-title">Simple 4-Step Process</h2>
+            <p class="section-description">Report problems quickly and track their resolution</p>
+        </div>
+
+        <div class="steps-grid">
+            <div class="step-card reveal reveal-delay-1">
+                <div class="step-number">1</div>
+                <h3>Register & Login</h3>
+                <p>Create your free account to start reporting problems in your area.</p>
+            </div>
+            <div class="step-card reveal reveal-delay-2">
+                <div class="step-number">2</div>
+                <h3>Report Problem</h3>
+                <p>Describe the issue, select category, and provide location details.</p>
+            </div>
+            <div class="step-card reveal reveal-delay-3">
+                <div class="step-number">3</div>
+                <h3>AI Analysis</h3>
+                <p>Our AI analyzes your complaint, assigns priority, and suggests solutions.</p>
+            </div>
+            <div class="step-card reveal reveal-delay-4">
+                <div class="step-number">4</div>
+                <h3>Track & Resolve</h3>
+                <p>Monitor your complaint status and get notified when it's resolved.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Recent Complaints -->
+{% if recent %}
+<section class="recent-section">
+    <div class="section-container">
+        <div class="section-header reveal">
+            <div class="section-badge"><i class="fas fa-clock"></i> Recent Activity</div>
+            <h2 class="section-title">Latest Complaints</h2>
+            <p class="section-description">See what's been reported recently</p>
+        </div>
+
+        <div class="complaint-list">
+            {% for c in recent %}
+            <a href="/complaint/{{ c.id }}" class="complaint-item reveal reveal-delay-{{ loop.index % 4 + 1 }}" style="text-decoration:none; color:inherit;">
+                <span class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
+                    {{ c.category or 'Other' }}
+                </span>
+                <div class="complaint-info">
+                    <h4>{{ c.description[:80] }}{% if c.description|length > 80 %}...{% endif %}</h4>
+                    <p>{{ c.created_at or 'Recently' }} {% if c.location %}· {{ c.location }}{% endif %}</p>
+                </div>
+                <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+                <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+            </a>
+            {% endfor %}
+        </div>
+
+        <div style="text-align: center; margin-top: 32px;" class="reveal">
+            <a href="/complaints" class="btn btn-outline">
+                <i class="fas fa-arrow-right"></i> View All Complaints
+            </a>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+{% endblock %}

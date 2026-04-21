@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Register — CivicPulse{% endblock %}
+
+{% block content %}
+<div class="form-page">
+    <div class="form-card">
+        <div class="form-header">
+            <div class="form-header-icon">
+                <i class="fas fa-user-plus"></i>
+            </div>
+            <h2>Create Account</h2>
+            <p>Join CivicPulse to report & track local problems</p>
+        </div>
+
+        <form action="/register" method="POST" id="registerForm">
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Full Name</label>
+                <input type="text" name="fullname" placeholder="Enter your full name" required>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-phone"></i> Mobile Number</label>
+                <input type="tel" name="mobile" id="mobileInput" placeholder="10-digit mobile number" required pattern="[6-9][0-9]{9}">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-envelope"></i> Gmail Address</label>
+                <div class="input-verify-wrap">
+                    <input type="email" name="email" id="emailInput" placeholder="example@gmail.com" required>
+                    <button type="button" class="btn-verify" onclick="simulateVerify(event, 'email')">Verify</button>
+                </div>
+                <div id="emailMsg" class="verify-msg"></div>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-at"></i> Username</label>
+                <input type="text" name="username" placeholder="Choose a username" required>
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-lock"></i> Password</label>
+                <input type="password" name="password" placeholder="Create a password" required minlength="6">
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;" id="registerBtn" disabled>
+                <i class="fas fa-user-plus"></i> Complete Registration
+            </button>
+        </form>
+
+        <div class="form-footer">
+            <p>Already have an account? <a href="/login">Login here</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Verification Styles */
+.input-verify-wrap {
+    display: flex;
+    gap: 8px;
+}
+.input-verify-wrap input {
+    flex: 1;
+}
+.btn-verify {
+    padding: 0 16px;
+    background: rgba(99, 102, 241, 0.1);
+    border: 1px solid var(--primary);
+    color: var(--primary-light);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+.btn-verify:hover {
+    background: var(--primary);
+    color: white;
+}
+.btn-verify.verified {
+    background: var(--success);
+    border-color: var(--success);
+    color: white;
+    cursor: default;
+}
+.verify-msg {
+    font-size: 12px;
+    margin-top: 4px;
+    min-height: 16px;
+    font-weight: 500;
+}
+.msg-success { color: var(--success); }
+.msg-error { color: var(--danger); }
+
+#registerBtn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #475569;
+}
+</style>
+
+<script>
+let emailVerified = false;
+
+function validateEmail(email) {
+    return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
+}
+
+function simulateVerify(event, type) {
+    const btn = event.currentTarget;
+    const input = document.getElementById(type + 'Input');
+    const msg = document.getElementById(type + 'Msg');
+    const value = input.value.trim();
+
+    if (!validateEmail(value)) {
+        msg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> Only verified @gmail.com addresses</span>';
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+    msg.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-envelope"></i> Sending real OTP...</span>';
+
+    fetch('/api/send-otp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ email: value })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const userOtp = prompt("REAL VERIFICATION: Check your Gmail for the 6-digit code:");
+            if (!userOtp) {
+                failVerify(btn, msg);
+                return;
+            }
+            
+            fetch('/api/verify-otp', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ otp: userOtp })
+            })
+            .then(res => res.json())
+            .then(vData => {
+                if (vData.success) {
+                    btn.innerHTML = '<i class="fas fa-check"></i> Verified';
+                    btn.className = 'btn-verify verified';
+                    msg.innerHTML = '<span class="msg-success"><i class="fas fa-check-circle"></i> Gmail verified!</span>';
+                    input.readOnly = true;
+                    emailVerified = true;
+                    document.getElementById('registerBtn').disabled = false;
+                } else {
+                    failVerify(btn, msg, vData.message);
+                }
+            });
+        } else {
+            failVerify(btn, msg, data.message);
+        }
+    })
+    .catch(err => {
+        failVerify(btn, msg, "Connection error.");
+    });
+}
+
+function failVerify(btn, msg, errorText = "Verification failed.") {
+    btn.disabled = false;
+    btn.innerHTML = 'Verify';
+    msg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> ' + errorText + '</span>';
+}
+</script>
+    </div>
+</div>
+{% endblock %}
