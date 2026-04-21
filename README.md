@@ -1,5 +1,21 @@
 # CivicPulse 🏙️ - Smart Local Problem Reporting System
 
+## 🚀 Deployment Instructions (Render)
+
+1.  **Login to Render**: Go to [dashboard.render.com](https://dashboard.render.com) and sign in with GitHub.
+2.  **Create New Blueprint**:
+    *   Click **"New +"** and select **"Blueprint"**.
+    *   Connect your `CivicPulse` repository.
+    *   Render will automatically read the `render.yaml` file I created.
+3.  **Configure Environment Variables**:
+    *   Once connected, it will ask for environment variables:
+        *   `GROQ_API_KEY`: Your Groq API Key.
+        *   `SECRET_KEY`: Any long random string (for session security).
+4.  **Deploy**: Click **"Apply"**. Render will build the environment and provide you with a `onrender.com` URL.
+
+> [!IMPORTANT]
+> **Ephemeral Filesystem Note**: On the free tier, images uploaded to `static/uploads/` and the `database.db` file will be wiped every time the server restarts (which happens at least once a day). For a permanent production app, consider using **Render Persistent Disks** or external services like **Cloudinary** for images and **Supabase/PostgreSQL** for the database.
+
 ## Overview
 CivicPulse is an AI-powered, modern civic engagement platform designed to bridge the gap between citizens and municipal authorities. It empowers users to seamlessly report local issues (such as potholes, water leakages, garbage, and streetlights) and provides administrators with a highly intelligent dashboard to triage, track, and resolve these complaints with maximum efficiency. 
 
