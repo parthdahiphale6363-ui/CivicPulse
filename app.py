@@ -27,7 +27,9 @@ except ImportError:
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
 
-UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+# Persistent Storage Logic (for Fly.io / Volumes)
+DATA_DIR = "/data" if os.path.exists("/data") else os.path.dirname(os.path.abspath(__file__))
+UPLOAD_FOLDER = os.path.join(DATA_DIR, 'static', 'uploads')
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'avi'}
@@ -162,7 +164,7 @@ def ask_groq_vision(base64_image, prompt="Analyze this image."):
 
 
 # ---------------- DATABASE CONNECTION ----------------
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "database.db")
+DB_PATH = os.path.join(DATA_DIR, "database.db")
 
 def get_db_connection():
     conn = sqlite3.connect(DB_PATH)
