@@ -1,0 +1,23 @@
+{
+  "name": "civicpulse",
+  "version": "1.0.0",
+  "description": "CivicPulse - A platform for civic engagement and complaint management",
+  "main": "app.py",
+  "scripts": {
+    "start": "python app.py",
+    "dev": "python app.py",
+    "build": "echo 'Build complete'",
+    "test": "echo 'No tests configured'"
+  },
+  "keywords": [
+    "civic",
+    "engagement",
+    "complaints",
+    "community"
+  ],
+  "author": "",
+  "license": "ISC",
+  "engines": {
+    "node": ">=14.0.0"
+  }
+}
