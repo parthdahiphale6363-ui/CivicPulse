@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CivicPulse | Digital Twin Intelligence</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --neon-cyan: #00f3ff;
+            --neon-purple: #9d00ff;
+            --neon-red: #ff0055;
+            --neon-green: #00ff9d;
+            --neon-gold: #ffaa00;
+            --bg-dark: #05070a;
+            --glass: rgba(10, 15, 25, 0.75);
+            --glass-bright: rgba(30, 41, 59, 0.5);
+            --border: rgba(0, 243, 255, 0.2);
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Outfit', sans-serif; 
+            background: var(--bg-dark); 
+            color: var(--text-main); 
+            overflow: hidden; 
+            height: 100vh;
+        }
+
+        #main-map { 
+            position: absolute; 
+            top: 0; left: 0; 
+            width: 100%; height: 100%; 
+            z-index: 1;
+        }
+
+        /* Overlay Layout */
+        .dashboard-overlay {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: grid;
+            grid-template-columns: 320px 1fr 340px;
+            grid-template-rows: 90px 1fr 140px;
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .panel {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 18px;
+            pointer-events: auto;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Header */
+        .header-panel {
+            grid-column: 1 / 3;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-weight: 700;
+            font-size: 22px;
+            letter-spacing: -0.5px;
+        }
+        .brand i { color: var(--neon-cyan); filter: drop-shadow(0 0 8px var(--neon-cyan)); }
+
+        .briefing-scroll {
+            flex: 1;
+            background: rgba(0,0,0,0.3);
+            border-radius: 10px;
+            padding: 10px 15px;
+            border-left: 3px solid var(--neon-cyan);
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+        }
+
+        /* Sidebar Panels */
+        .sidebar { grid-row: 2 / 3; display: flex; flex-direction: column; gap: 20px; }
+        
+        .stat-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            padding: 12px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        .stat-val { font-size: 20px; font-weight: 800; color: var(--neon-cyan); }
+        .stat-label { font-size: 9px; text-transform: uppercase; color: var(--text-dim); margin-top: 4px; }
+
+        /* Scrollable List for Ward Stats */
+        .scroll-area {
+            flex: 1;
+            overflow-y: auto;
+            margin-top: 10px;
+            padding-right: 5px;
+        }
+        .scroll-area::-webkit-scrollbar { width: 4px; }
+        .scroll-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+        .ward-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            font-size: 13px;
+        }
+        .ward-info { display: flex; flex-direction: column; }
+        .ward-grade {
+            background: var(--grad-color);
+            color: black;
+            width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            border-radius: 4px; font-weight: 800; font-size: 12px;
+        }
+
+        /* Map Controls */
+        .map-tools {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            z-index: 20;
+            pointer-events: auto;
+        }
+        .tool-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 18px;
+        }
+        .tool-btn:hover, .tool-btn.active {
+            background: var(--neon-cyan);
+            color: black;
+            box-shadow: 0 0 15px var(--neon-cyan);
+            border-color: var(--neon-cyan);
+        }
+
+        /* Bottom Intelligence Panel */
+        .bottom-panel {
+            grid-column: 1 / 4;
+            display: grid;
+            grid-template-columns: 1fr 2fr 1fr;
+            gap: 20px;
+        }
+
+        /* Timeline Chart */
+        .timeline-viz {
+            display: flex;
+            align-items: flex-end;
+            gap: 4px;
+            height: 60px;
+            padding: 5px;
+        }
+        .timeline-bar {
+            flex: 1;
+            background: var(--neon-cyan);
+            opacity: 0.3;
+            border-radius: 2px 2px 0 0;
+            transition: height 0.3s, opacity 0.3s;
+        }
+        .timeline-bar:hover { opacity: 1; }
+
+        /* AR UI */
+        #ar-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 1000;
+            display: none;
+            background: black;
+        }
+        #ar-video { width: 100%; height: 100%; object-fit: cover; }
+        .ar-hud {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            padding: 40px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            background: radial-gradient(circle, transparent 40%, rgba(0,243,255,0.1) 100%);
+            pointer-events: none;
+        }
+        .ar-tag {
+            position: absolute;
+            background: rgba(10, 20, 30, 0.9);
+            border: 1px solid var(--neon-cyan);
+            padding: 12px 20px;
+            border-radius: 12px;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            pointer-events: auto;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.4);
+            animation: tag-float 3s ease-in-out infinite;
+        }
+        @keyframes tag-float {
+            0%, 100% { transform: translate(-50%, -52%); }
+            50% { transform: translate(-50%, -48%); }
+        }
+
+        /* Marker Styles */
+        .pulse-marker {
+            background: var(--p-color, var(--neon-cyan));
+            border-radius: 50%;
+            position: relative;
+        }
+        .pulse-marker::after {
+            content: '';
+            position: absolute;
+            top: -50%; left: -50%;
+            width: 200%; height: 200%;
+            border-radius: 50%;
+            border: 2px solid var(--p-color, var(--neon-cyan));
+            animation: ripple 2s infinite linear;
+        }
+        @keyframes ripple {
+            0% { transform: scale(0.5); opacity: 1; }
+            100% { transform: scale(2); opacity: 0; }
+        }
+
+        /* Disaster Simulation Results */
+        .risk-alert {
+            background: rgba(255, 0, 85, 0.1);
+            border-left: 4px solid var(--neon-red);
+            padding: 10px;
+            margin-top: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        /* Section Headings */
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--neon-cyan);
+            margin-bottom: 12px;
+        }
+
+        /* Simulation Controls Overlay */
+        .side-panel {
+            grid-column: 3 / 4;
+            grid-row: 1 / 3;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .prime-input {
+            flex: 1;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 15px;
+            color: white;
+            font-size: 13px;
+        }
+        .prime-btn {
+            background: var(--neon-cyan);
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .prime-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+
+    </style>
+</head>
+<body>
+
+    <div id="main-map"></div>
+
+    <div class="map-tools">
+        <div class="tool-btn active" title="Standard View" onclick="setMode('standard')"><i class="fas fa-layer-group"></i></div>
+        <div class="tool-btn" id="heat-tool" title="Health Heatmap" onclick="toggleHeatmap()"><i class="fas fa-fire"></i></div>
+        <div class="tool-btn" title="AI Risk Lens" onclick="toggleAR()"><i class="fas fa-mobile-alt"></i></div>
+    </div>
+
+    <div class="dashboard-overlay">
+        <!-- Header -->
+        <div class="panel header-panel">
+            <div class="brand">
+                <i class="fas fa-microchip"></i>
+                CIVICPULSE <span style="font-size: 10px; background: rgba(0,243,255,0.2); padding: 2px 6px; border-radius: 4px; margin-left: 5px;">LIVE TWIN</span>
+            </div>
+            <div class="briefing-scroll" id="daily-briefing-bar">
+                <i class="fas fa-bolt" style="color: var(--neon-gold);"></i>
+                <span id="briefing-text">Synchronizing with Municipal Intelligence...</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 15px; padding-left: 20px; border-left: 1px solid var(--border);">
+                <div style="text-align: right;">
+                    <div style="font-size: 10px; color: var(--text-dim);">SYSTEM HEALTH</div>
+                    <div id="health-grade-val" style="font-weight: 800; color: var(--neon-green);">EXCELLENT</div>
+                </div>
+                <div id="health-score-ring" style="width: 45px; height: 45px; position: relative;">
+                    <svg viewBox="0 0 36 36" style="transform: rotate(-90deg);">
+                        <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"></circle>
+                        <circle id="score-circle" cx="18" cy="18" r="16" fill="none" stroke="var(--neon-cyan)" stroke-width="3" stroke-dasharray="100, 100"></circle>
+                    </svg>
+                    <div id="score-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 12px; font-weight: 800;">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar Left -->
+        <div class="sidebar">
+            <!-- Stats -->
+            <div class="panel">
+                <div class="section-title"><i class="fas fa-chart-pie"></i> Pulse Metrics</div>
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-val" id="stat-total">--</div>
+                        <div class="stat-label">Total Reports</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-val" id="stat-pending" style="color: var(--neon-red);">--</div>
+                        <div class="stat-label">Unresolved</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-val" id="stat-resolved" style="color: var(--neon-green);">--</div>
+                        <div class="stat-label">Resolved</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-val" id="stat-7d" style="color: var(--neon-purple);">--</div>
+                        <div class="stat-label">Recent 7d</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ward Ranking -->
+            <div class="panel" style="flex: 1;">
+                <div class="section-title"><i class="fas fa-building-user"></i> Regional Integrity</div>
+                <div class="scroll-area" id="ward-list">
+                    <div style="text-align: center; padding: 20px; color: var(--text-dim);">Loading Ward Data...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side - Intelligence & Analysis -->
+        <div class="side-panel">
+            <!-- AI Intelligence Panel -->
+            <div class="panel" style="flex: 1.5;">
+                <div class="section-title"><i class="fas fa-brain"></i> Intelligence HQ</div>
+                <div id="ai-briefing-full" class="scroll-area" style="font-size: 13px; line-height: 1.6;">
+                    <div style="text-align: center; padding: 30px 0;">
+                        <i class="fas fa-microchip fa-spin" style="font-size: 24px; color: var(--neon-cyan);"></i>
+                        <p style="margin-top: 15px; font-size: 11px;">Gathering city intelligence...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk Assessment -->
+            <div class="panel">
+                <div class="section-title"><i class="fas fa-shield-halved"></i> Risk Assessment</div>
+                <div class="input-group">
+                    <input type="text" id="sim-query" class="prime-input" placeholder="e.g. Heavy Rain">
+                    <button class="prime-btn" onclick="runSimulation()" style="padding: 10px;"><i class="fas fa-play"></i></button>
+                </div>
+                <div id="sim-results" style="font-size: 11px;">
+                    <p style="color: var(--text-dim);">Enter a scenario for AI risk modeling.</p>
+                </div>
+            </div>
+            
+            <!-- Hotspots Forecast -->
+             <div class="panel">
+                <div class="section-title"><i class="fas fa-fire"></i> Hotspot Forecast</div>
+                <div id="hotspot-list" style="font-size: 12px;">
+                    <p style="color: var(--text-dim);">Predicting emerging clusters...</p>
+                </div>
+             </div>
+        </div>
+
+        <!-- Bottom Timeline -->
+        <div class="bottom-panel">
+            <div class="panel" style="grid-column: 1 / 4; flex-direction: row; align-items: center; justify-content: space-between;">
+                <div style="width: 200px;">
+                    <div style="font-size: 11px; color: var(--neon-cyan); font-weight: 800;">24H VELOCITY</div>
+                    <div style="font-size: 24px; font-weight: 800;" id="velocity-count">--</div>
+                    <div style="font-size: 10px; color: var(--text-dim);">Reports per hour</div>
+                </div>
+                <div class="timeline-viz" id="timeline-chart" style="flex: 1; margin: 0 40px;">
+                    <!-- SVG Bars generated by JS -->
+                </div>
+                <div style="text-align: right; width: 180px;">
+                    <div style="font-size: 10px; color: var(--text-dim);">SYSTEM STATUS</div>
+                    <div style="color: var(--neon-green); font-weight: 800; font-size: 12px;"><i class="fas fa-check-circle"></i> DATA SYNCED</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AR Overlay -->
+    <div id="ar-overlay">
+        <video id="ar-video" autoplay playsinline></video>
+        <div class="ar-hud" id="ar-container"></div>
+        <button onclick="toggleAR()" style="position: absolute; top:30px; right:30px; width:60px; height:60px; border-radius:50%; background:var(--neon-red); color:white; border:none; font-size:24px; cursor:pointer; z-index:1001;">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // CONFIG
+        const map = L.map('main-map', { zoomControl: false, attributionControl: false }).setView([20.5937, 78.9629], 5);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+        let complaints = [];
+        let markers = {
+            complaints: [],
+            risks: [],
+            heatmap: null
+        };
+        let showHeatmap = false;
+        let currentMode = 'standard';
+
+        // INITIAL LOAD
+        async function init() {
+            await Promise.all([
+                fetchData(),
+                fetchHealth(),
+                fetchWardStats(),
+                fetchBriefing(),
+                fetchHotspots(),
+                fetchTimeline()
+            ]);
+        }
+
+        async function fetchData() {
+            const res = await fetch('/api/city-twin/data');
+            const data = await res.json();
+            complaints = data.complaints;
+            workers = data.workers;
+            updateMapDisplay();
+            
+            // Update Stat Cards
+            document.getElementById('stat-total').innerText = complaints.length;
+            document.getElementById('stat-pending').innerText = complaints.filter(c => c.status === 'Pending').length;
+            document.getElementById('stat-resolved').innerText = complaints.filter(c => c.status === 'Resolved').length;
+        }
+
+        async function fetchHealth() {
+            const res = await fetch('/api/city-twin/health');
+            const data = await res.json();
+            document.getElementById('score-text').innerText = data.score;
+            document.getElementById('score-circle').style.strokeDasharray = `${data.score}, 100`;
+            document.getElementById('health-grade-val').innerText = data.grade === 'A' ? 'OPTIMAL' : (data.grade === 'B' ? 'STABLE' : (data.grade === 'C' ? 'ALERT' : 'CRITICAL'));
+            document.getElementById('health-grade-val').style.color = data.score >= 70 ? 'var(--neon-green)' : (data.score >= 50 ? 'var(--neon-gold)' : 'var(--neon-red)');
+            document.getElementById('stat-7d').innerText = data.recent_7days;
+        }
+
+        async function fetchWardStats() {
+            const res = await fetch('/api/city-twin/ward-stats');
+            const data = await res.json();
+            const container = document.getElementById('ward-list');
+            container.innerHTML = data.wards.map(w => {
+                const color = w.health >= 85 ? 'var(--neon-green)' : (w.health >= 70 ? 'var(--neon-gold)' : 'var(--neon-red)');
+                return `
+                    <div class="ward-item">
+                        <div class="ward-info">
+                            <span style="font-weight: 700;">${w.ward}</span>
+                            <span style="font-size: 10px; color: var(--text-dim);">${w.total} reports / ${w.critical} critical</span>
+                        </div>
+                        <div class="ward-grade" style="--grad-color: ${color}">${w.grade}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function fetchBriefing() {
+            const res = await fetch('/api/city-twin/daily-briefing');
+            const data = await res.json();
+            document.getElementById('briefing-text').innerText = data.briefing;
+            
+            // Populate Side HQ
+            const hq = document.getElementById('ai-briefing-full');
+            hq.innerHTML = `
+                <div style="background: rgba(0,243,255,0.05); padding: 15px; border-radius: 12px; margin-bottom: 20px; border-left: 4px solid var(--neon-cyan);">
+                    <div style="font-weight: 800; color: var(--neon-cyan); margin-bottom: 5px;">COMMANDER'S SUMMARY</div>
+                    ${data.briefing}
+                </div>
+                <div class="stat-grid" style="margin-bottom: 20px;">
+                    <div class="stat-card">
+                        <div class="stat-val">${data.stats.new_today}</div>
+                        <div class="stat-label">New 24h</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-val">${data.stats.critical}</div>
+                        <div class="stat-label">Critical</div>
+                    </div>
+                </div>
+                <div style="font-size: 12px; color: var(--text-dim);">
+                    <i class="fas fa-clock"></i> Generated: ${new Date(data.generated).toLocaleTimeString()}
+                </div>
+            `;
+        }
+
+        async function fetchHotspots() {
+            const res = await fetch('/api/city-twin/hotspot-forecast');
+            const data = await res.json();
+            const container = document.getElementById('hotspot-list');
+            if (data.hotspots.length === 0) {
+                container.innerHTML = `<p style="color: var(--text-dim);">${data.summary}</p>`;
+                return;
+            }
+            container.innerHTML = data.hotspots.map(h => `
+                <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 8px; margin-bottom: 8px; border-left: 2px solid var(--neon-purple);">
+                    <div style="font-weight: 700; color: var(--neon-purple);">${h.category}</div>
+                    <div style="font-size: 10px;">${h.probability}% risk • ${h.reason}</div>
+                </div>
+            `).join('');
+        }
+
+        async function fetchTimeline() {
+            const res = await fetch('/api/city-twin/timeline');
+            const data = await res.json();
+            const chart = document.getElementById('timeline-chart');
+            const counts = data.timeline.map(t => t.count);
+            const maxVal = Math.max(...counts, 1);
+            
+            chart.innerHTML = data.timeline.map(t => {
+                const h = (t.count / maxVal) * 100;
+                return `<div class="timeline-bar" style="height: ${h}%" title="${t.hour}: ${t.count} reports"></div>`;
+            }).join('');
+            
+            document.getElementById('velocity-count').innerText = counts.reduce((a,b) => a+b, 0);
+        }
+
+        function updateMapDisplay() {
+            markers.complaints.forEach(m => map.removeLayer(m));
+            markers.complaints = [];
+
+            complaints.forEach(c => {
+                const color = c.status === 'Resolved' ? '#00ff9d' : (c.priority === 'High' ? '#ff0055' : '#ffaa00');
+                const radius = c.pulse_radius || 12;
+                
+                const icon = L.divIcon({
+                    className: 'marker-wrap',
+                    html: `<div class="pulse-marker" style="--p-color: ${color}; width: ${radius}px; height: ${radius}px;"></div>`,
+                    iconSize: [radius, radius]
+                });
+
+                const m = L.marker([c.latitude, c.longitude], { icon })
+                    .bindPopup(`
+                        <div style="min-width: 150px;">
+                            <div style="font-weight: 800; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; margin-bottom: 8px; font-size: 14px;">${c.category}</div>
+                            <div style="font-size: 12px; margin-bottom: 5px;">${c.description}</div>
+                            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #94a3b8;">
+                                <span>Severity: ${c.severity_score}/100</span>
+                                <span>${c.status}</span>
+                            </div>
+                        </div>
+                    `)
+                    .addTo(map);
+                markers.complaints.push(m);
+            });
+        }
+
+        async function toggleHeatmap() {
+            showHeatmap = !showHeatmap;
+            const btn = document.getElementById('heat-tool');
+            btn.classList.toggle('active');
+
+            if (showHeatmap) {
+                const res = await fetch('/api/city-twin/heatmap');
+                const data = await res.json();
+                if (markers.heatmap) map.removeLayer(markers.heatmap);
+                markers.heatmap = L.heatLayer(data, {
+                    radius: 25,
+                    blur: 15,
+                    maxZoom: 17,
+                    gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+                }).addTo(map);
+            } else {
+                if (markers.heatmap) map.removeLayer(markers.heatmap);
+            }
+        }
+
+        async function fetchSentiment() {
+            // Deprecated in favor of Real Heatmap
+        }
+
+        async function runOptimization() {
+            const container = document.getElementById('optima-content');
+            container.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-sync fa-spin" style="font-size: 24px; color: var(--neon-cyan);"></i><br><br>Analyzing Fleet Logic...</div>';
+            
+            const res = await fetch('/api/city-twin/optimize-resources');
+            const data = await res.json();
+            
+            if (data.assignments && data.assignments.length > 0) {
+                container.innerHTML = `
+                    <div style="font-weight: 600; color: var(--neon-cyan); margin-bottom: 8px;">Recommended Dispatch:</div>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        ${data.assignments.map(a => `
+                            <div style="background: rgba(255,255,255,0.05); padding: 8px; border-radius: 6px;">
+                                <div style="display: flex; justify-content: space-between;">
+                                    <span style="font-weight: 700;">${a.worker}</span>
+                                    <span style="color: var(--neon-green);">${a.eta_minutes}m ETA</span>
+                                </div>
+                                <div style="font-size: 10px; color: var(--text-dim);">${a.reason}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <p style="margin-top: 10px; font-style: italic; color: var(--text-dim);">${data.summary}</p>
+                `;
+            } else {
+                container.innerHTML = `<p style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 8px;">${data.summary || 'Optimization engine offline.'}</p>`;
+            }
+        }
+
+        async function runSimulation() {
+            const query = document.getElementById('sim-query').value;
+            const resDiv = document.getElementById('sim-results');
+            if(!query) return;
+            
+            resDiv.innerHTML = '<div style="text-align: center; padding: 20px;"><i class="fas fa-microchip fa-spin" style="font-size: 24px; color: var(--neon-red);"></i><br><br>Simulating Cascade...</div>';
+            
+            const res = await fetch('/api/city-twin/simulate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ condition: query })
+            });
+            const data = await res.json();
+            
+            resDiv.innerHTML = `
+                <div style="font-size: 14px; margin-bottom: 10px;">Probablity of Incident: <span style="color: var(--neon-red); font-weight: 800;">${data.probability}%</span></div>
+                <div style="font-size: 10px; text-transform: uppercase; color: var(--text-dim);">Critical Actions:</div>
+                ${data.actions.map(a => `<div class="risk-alert"><i class="fas fa-shield-alt"></i> ${a}</div>`).join('')}
+                <div style="margin-top: 10px; font-size: 11px;">Timeline: ${data.timeline}</div>
+            `;
+
+            // Mark Risk Zones
+            data.risk_zones.forEach(z => {
+                const circle = L.circle([z.lat, z.lng], {
+                    radius: 2000, color: '#ff0055', fillOpacity: 0.4
+                }).addTo(map);
+                circle.bindPopup(`<b>RISK ALERT</b><br>${z.desc}`).openPopup();
+                markers.risks.push(circle);
+            });
+        }
+
+        async function syncFleet() {
+            const center = map.getCenter();
+            for(let i=0; i<4; i++) {
+                const lat = center.lat + (Math.random() * 0.1 - 0.05);
+                const lng = center.lng + (Math.random() * 0.1 - 0.05);
+                const name = "Squad-" + (100 + i);
+                await fetch('/api/city-twin/worker-location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, lat, lng, assignment: 'Live Recon' })
+                });
+            }
+            showWorkers = true;
+            fetchData();
+        }
+
+        function toggleWorkers() {
+            showWorkers = !showWorkers;
+            updateMapDisplay();
+            document.querySelector('[title="Labor Fleet"]').classList.toggle('active');
+        }
+
+        // AR MODE
+        let arActive = false;
+        async function toggleAR() {
+            const overlay = document.getElementById('ar-overlay');
+            const video = document.getElementById('ar-video');
+            if(!arActive) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+                    video.srcObject = stream;
+                    overlay.style.display = 'block';
+                    arActive = true;
+                    startARUpdate();
+                } catch(e) { alert("Camera access needed for Augmented Reality."); }
+            } else {
+                if(video.srcObject) video.srcObject.getTracks().forEach(t => t.stop());
+                overlay.style.display = 'none';
+                arActive = false;
+            }
+        }
+
+        async function startARUpdate() {
+            if(!arActive) return;
+            const container = document.getElementById('ar-container');
+            
+            navigator.geolocation.getCurrentPosition(async (pos) => {
+                const { latitude, longitude } = pos.coords;
+                const res = await fetch(`/api/city-twin/ar-complaints?lat=${latitude}&lng=${longitude}&radius=1000`);
+                const data = await res.json();
+                
+                container.innerHTML = data.complaints.map(c => {
+                    // Position tags randomly/horizontally for effect as true AR math is complex for layout
+                    const x = 20 + Math.random() * 60;
+                    const y = 30 + Math.random() * 40;
+                    return `
+                        <div class="ar-tag" style="left: ${x}%; top: ${y}%;">
+                            <div style="font-weight: 800; font-size: 18px; color: var(--neon-cyan);">${c.category}</div>
+                            <div style="font-size: 12px;">${c.distance_m}m Range • Bearing ${c.bearing}°</div>
+                            <div style="font-size: 10px; color: var(--text-dim);">${c.description.substring(0, 40)}...</div>
+                        </div>
+                    `;
+                }).join('');
+            });
+            
+            if(arActive) setTimeout(startARUpdate, 5000);
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+            document.querySelector(`[onclick="setMode('${mode}')"]`).classList.add('active');
+        }
+
+        // AUTO REFRESH
+        setInterval(fetchData, 45000);
+        init();
+
+    </script>
+</body>
+</html>

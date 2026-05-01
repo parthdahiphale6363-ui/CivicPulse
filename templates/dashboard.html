@@ -6,8 +6,10 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
-#civicMap { height: 400px; width: 100%; border-radius: var(--radius-sm); z-index: 1;}
+#hotspotsMap { height: 400px; width: 100%; border-radius: var(--radius-sm); z-index: 1;}
+#healthHeatmap { height: 400px; width: 100%; border-radius: var(--radius-sm); z-index: 1;}
 </style>
+<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -26,15 +28,15 @@
     <div class="dashboard-stats">
         <div class="dash-stat reveal reveal-delay-1">
             <div class="dash-stat-header">
-                <span style="color: var(--text-secondary);">Total</span>
-                <i class="fas fa-clipboard-list" style="color: var(--primary-light);"></i>
+                <span style="color: var(--text-secondary);">Total Reported</span>
+                <i class="fas fa-clipboard-list" style="color: var(--primary);"></i>
             </div>
-            <div class="dash-stat-value" style="color: var(--primary-light);">{{ total }}</div>
-            <div class="dash-stat-label">Total Complaints</div>
+            <div class="dash-stat-value" style="color: var(--primary);">{{ total }}</div>
+            <div class="dash-stat-label">Total Complaints Volume</div>
         </div>
         <div class="dash-stat reveal reveal-delay-2">
             <div class="dash-stat-header">
-                <span style="color: var(--text-secondary);">Pending</span>
+                <span style="color: var(--text-secondary);">Critical Pending</span>
                 <i class="fas fa-clock" style="color: var(--warning);"></i>
             </div>
             <div class="dash-stat-value" style="color: var(--warning);">{{ pending }}</div>
@@ -42,7 +44,7 @@
         </div>
         <div class="dash-stat reveal reveal-delay-3">
             <div class="dash-stat-header">
-                <span style="color: var(--text-secondary);">Resolved</span>
+                <span style="color: var(--text-secondary);">Resolution Rate</span>
                 <i class="fas fa-check-circle" style="color: var(--success);"></i>
             </div>
             <div class="dash-stat-value" style="color: var(--success);">{{ resolved }}</div>
@@ -50,11 +52,11 @@
         </div>
         <div class="dash-stat reveal reveal-delay-4">
             <div class="dash-stat-header">
-                <span style="color: var(--text-secondary);">Users</span>
+                <span style="color: var(--text-secondary);">Engagement</span>
                 <i class="fas fa-users" style="color: var(--accent);"></i>
             </div>
             <div class="dash-stat-value" style="color: var(--accent);">{{ users_count }}</div>
-            <div class="dash-stat-label">Registered Users</div>
+            <div class="dash-stat-label">Active Citizens</div>
         </div>
     </div>
 
@@ -86,6 +88,117 @@
         </div>
     </div>
 
+    <div class="dash-card reveal" style="margin-bottom: 24px; padding: 0; overflow: hidden; border: 1px solid var(--border);">
+        <div style="padding: 16px 24px; background: var(--bg-secondary); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <i class="fas fa-map-marked-alt" style="color: var(--primary);"></i>
+                <div>
+                    <h3 style="font-size: 16px; font-weight: 700;">Local Reporting Hotspots</h3>
+                    <p style="font-size: 11px; color: var(--text-muted);">Real-time + Predictive Geospatial Data</p>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button onclick="toggleMapLayer('real')" id="btnLayerReal" class="btn btn-sm btn-primary" style="padding: 6px 12px; font-size: 11px;">Active</button>
+                <button onclick="toggleMapLayer('predict')" id="btnLayerPredict" class="btn btn-sm btn-outline" style="padding: 6px 12px; font-size: 11px;">Predictive 🚀</button>
+            </div>
+        </div>
+        <div id="hotspotsMap" style="height: 400px; width: 100%;"></div>
+    </div>
+
+    <div class="dashboard-grid" style="margin-bottom: 24px;">
+        <!-- Left: Viral Alerts -->
+        <div class="dash-card reveal" style="border-left: 4px solid var(--danger);">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-fire-alt" style="color: var(--danger);"></i> Viral Risk Alerts</h3>
+                <span class="badge badge-danger">Live Tracking</span>
+            </div>
+            <div id="viralAlerts" style="display: flex; flex-direction: column; gap: 12px; margin-top: 10px;">
+                <div class="ai-summary-loading" style="padding: 20px 0;"><div class="dot-pulse"><span></span><span></span><span></span></div></div>
+            </div>
+        </div>
+
+        <!-- Right: Weekly Strategic Report -->
+        <div class="dash-card reveal" style="border-left: 4px solid var(--accent);">
+            <div class="dash-card-header">
+                <h3><i class="fas fa-file-invoice" style="color: var(--accent);"></i> Weekly Ward Report</h3>
+                <button onclick="generateWeeklyReport()" class="btn btn-sm btn-primary" style="background: var(--accent); border: none;">
+                    <i class="fas fa-sync"></i> Generate
+                </button>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px;">
+                Automatically synthesize all ward data into a formal PDF/Text report for Municipal Commissioners.
+            </p>
+            <div id="weeklyReportPreview" style="margin-top: 12px; display: none; padding: 12px; background: var(--bg-secondary); border-radius: var(--radius-sm); border-left: 2px solid var(--accent);">
+                <div style="font-size: 12px; line-height: 1.5; color: var(--text-primary); max-height: 150px; overflow-y: auto;" id="reportText"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Department-wise Intelligence Hub -->
+    <div class="reveal" style="margin-bottom: 40px;">
+        <div class="dash-card-header" style="margin-bottom: 20px;">
+            <h3><i class="fas fa-microchip" style="color: var(--accent);"></i> Departmental Intelligence</h3>
+            <span class="badge badge-default" style="font-size: 11px;">Powered by Groq AI</span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 20px;">
+            {% for cat in categories %}
+            <div class="dash-card" style="padding: 24px; border: 1px solid var(--border); transition: all 0.3s ease; position: relative; overflow: hidden; display: flex; flex-direction: column; gap: 16px;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between;">
+                    <div style="width: 50px; height: 50px; border-radius: 12px; background: var(--bg-secondary); display: flex; align-items: center; justify-content: center; font-size: 22px; color: var(--primary);">
+                        <i class="fas {% if cat.category == 'Pothole' %}fa-road{% elif cat.category == 'Garbage' %}fa-trash-alt{% elif cat.category == 'Water Leakage' %}fa-tint{% elif cat.category == 'Streetlight' %}fa-bolt{% elif cat.category == 'Sewage' %}fa-water{% elif cat.category == 'Road Damage' %}fa-road{% elif cat.category == 'Traffic Signal' %}fa-traffic-light{% elif cat.category == 'Noise Pollution' %}fa-volume-up{% elif cat.category == 'Illegal Dumping' %}fa-dumpster{% else %}fa-building{% endif %}"></i>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 28px; font-weight: 800; color: var(--primary);">{{ cat.count }}</div>
+                        <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">Pending Reports</div>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">{{ cat.category }}</h4>
+                    <p style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">Active municipal oversight for all {{ cat.category }} related public concerns.</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: auto;">
+                    <a href="/complaints?category={{ cat.category }}" class="btn btn-sm btn-outline" style="justify-content: center; font-size: 12px;">
+                        <i class="fas fa-list"></i> View All
+                    </a>
+                    <button onclick="getDeptInsight('{{ cat.category }}')" class="btn btn-sm btn-primary" style="justify-content: center; font-size: 12px; background: linear-gradient(135deg, var(--primary), var(--accent)); border: none;">
+                        <i class="fas fa-sparkles"></i> AI Insight
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+            {% if not categories %}
+            <p style="color: var(--text-muted); grid-column: 1 / -1;">No active departmental data found.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Dept Insight Modal -->
+    <div id="deptInsightModal" class="modal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(8px); z-index: 2000; align-items: center; justify-content: center; padding: 20px;">
+        <div class="dash-card reveal-scale" style="max-width: 600px; width: 100%; padding: 0; overflow: hidden; box-shadow: var(--shadow-2xl); border: 1px solid var(--primary-glow);">
+            <div style="padding: 24px; background: var(--primary); color: white; display: flex; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <i class="fas fa-robot" style="font-size: 24px;"></i>
+                    <div>
+                        <h3 id="modalDeptTitle" style="font-size: 18px; font-weight: 700;">Department Intelligence</h3>
+                        <p style="font-size: 11px; opacity: 0.8;">Groq AI Strategic Analysis</p>
+                    </div>
+                </div>
+                <button onclick="closeDeptModal()" style="background: none; border: none; color: white; cursor: pointer; font-size: 20px;"><i class="fas fa-times"></i></button>
+            </div>
+            <div id="modalContent" style="padding: 32px; font-size: 14px; line-height: 1.8; color: var(--text-primary); max-height: 70vh; overflow-y: auto;">
+                <div class="ai-summary-loading" style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 40px 0;">
+                    <div class="dot-pulse"><span></span><span></span><span></span></div>
+                    <p style="color: var(--text-secondary); font-weight: 600;">Analyzing departmental reports...</p>
+                </div>
+            </div>
+            <div style="padding: 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; background: var(--bg-secondary);">
+                <button onclick="closeDeptModal()" class="btn btn-outline" style="padding: 8px 16px; font-size: 13px;">Acknowledge</button>
+            </div>
+        </div>
+    </div>
+
     <!-- AI Summary -->
     <div class="ai-summary-box reveal">
         <h3><i class="fas fa-robot"></i> AI-Powered Insights <span class="ai-badge"><i class="fas fa-sparkles"></i> Groq AI</span></h3>
@@ -103,7 +216,7 @@
             <div class="dash-card-header">
                 <h3><i class="fas fa-map-marked-alt" style="color: var(--warning);"></i> Civic Health Heatmap</h3>
             </div>
-            <div id="civicMap"></div>
+            <div id="healthHeatmap"></div>
         </div>
 
         <div class="dash-card reveal">
@@ -189,18 +302,22 @@
     <!-- Announcements Management -->
     <div class="dashboard-grid" style="margin-top: 24px;">
         <div class="dash-card reveal">
-            <div class="dash-card-header">
+            <div class="dash-card-header" style="display: flex; justify-content: space-between; align-items: center;">
                 <h3><i class="fas fa-bullhorn" style="color: var(--warning);"></i> Create Announcement</h3>
+                <button type="button" class="btn btn-sm btn-outline" id="enhanceAnnounceBtn" onclick="enhanceAnnouncement()" style="border-color: var(--accent); color: var(--accent); padding: 4px 10px;">
+                    <i class="fas fa-magic"></i> AI Enhance
+                </button>
             </div>
+            <div id="announceLoadingStatus" style="font-size: 12px; margin-bottom: 10px;"></div>
             <form action="/announcement" method="POST">
                 <div class="form-group">
                     <label>Title</label>
-                    <input type="text" name="title" placeholder="Announcement title" required
+                    <input type="text" name="title" id="announceTitle" placeholder="Announcement title" required
                         style="width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif;">
                 </div>
                 <div class="form-group">
                     <label>Content</label>
-                    <textarea name="content" placeholder="Announcement content..." required rows="3"
+                    <textarea name="content" id="announceContent" placeholder="Announcement content..." required rows="3"
                         style="width: 100%; padding: 10px 14px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical;"></textarea>
                 </div>
                 <button type="submit" class="btn btn-primary btn-sm">
@@ -232,36 +349,198 @@
     </div>
 </div>
 <script>
+    // Department AI Insight Handlers
+    function getDeptInsight(category) {
+        const modal = document.getElementById('deptInsightModal');
+        const content = document.getElementById('modalContent');
+        const title = document.getElementById('modalDeptTitle');
+        
+        title.innerText = category + " Department Analysis";
+        content.innerHTML = `
+            <div class="ai-summary-loading" style="display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 40px 0;">
+                <div class="dot-pulse"><span></span><span></span><span></span></div>
+                <p style="color: var(--text-secondary); font-weight: 600;">Analyzing ${category} department reports...</p>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+        
+        fetch(`/admin/dept-insight/${category}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.insight) {
+                // Formatting the AI text nicely
+                const formatted = data.insight
+                    .replace(/\n\n/g, '<br><br>')
+                    .replace(/\d\.\s/g, '<strong>$&</strong>');
+                content.innerHTML = `<div class="reveal-fade">${formatted}</div>`;
+            } else {
+                content.innerHTML = `<p style="color: var(--danger);">Unable to generate insight at this time.</p>`;
+            }
+        });
+    }
+
+    function closeDeptModal() {
+        document.getElementById('deptInsightModal').style.display = 'none';
+    }
+
+    function enhanceAnnouncement() {
+        const titleInput = document.getElementById('announceTitle');
+        const contentInput = document.getElementById('announceContent');
+        const status = document.getElementById('announceLoadingStatus');
+        const btn = document.getElementById('enhanceAnnounceBtn');
+        
+        const title = titleInput.value.trim();
+        const content = contentInput.value.trim();
+        
+        if (!title && !content) {
+            status.innerHTML = '<span style="color: var(--warning);">Please enter a title or content to enhance.</span>';
+            return;
+        }
+        
+        btn.disabled = true;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enhancing...';
+        status.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-robot"></i> AI municipal expert is rewriting...</span>';
+        
+        fetch('/api/enhance-announcement', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: title, content: content })
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.title || data.content) {
+                if (data.title) titleInput.value = data.title;
+                if (data.content) contentInput.value = data.content;
+                status.innerHTML = '<span style="color: var(--success);"><i class="fas fa-check-circle"></i> Perfectly enhanced for citizens!</span>';
+            } else {
+                status.innerHTML = `<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> ${data.error || 'Enhancement failed.'}</span>`;
+            }
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic"></i> AI Enhance';
+        })
+        .catch(e => {
+            status.innerHTML = '<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> Network error.</span>';
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-magic"></i> AI Enhance';
+        });
+    }
+
+    // Viral Alerts Loader
+    function fetchViralAlerts() {
+        fetch('/admin/viral-alerts')
+        .then(r => r.json())
+        .then(data => {
+            const container = document.getElementById('viralAlerts');
+            container.innerHTML = '';
+            if(!data || data.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted); font-size: 13px;">No critical alerts currently.</p>';
+                return;
+            }
+            data.forEach(a => {
+                const color = a.frustration === 'High' ? 'var(--danger)' : 'var(--warning)';
+                container.innerHTML += `
+                    <div style="padding: 10px; background: rgba(255,255,255,0.05); border-left: 3px solid ${color}; border-radius: 4px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; font-size: 13px;">#${a.id} ${a.category}</span>
+                            <span class="badge" style="background: ${color}; font-size: 10px;">${a.frustration} Risk</span>
+                        </div>
+                        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px;">
+                            <i class="fas fa-arrow-up"></i> ${a.upvotes} Upvotes | ${a.days_pending} Days Pending
+                        </div>
+                    </div>
+                `;
+            });
+        });
+    }
+
+    // Weekly Report Generator
+    function generateWeeklyReport() {
+        const textDiv = document.getElementById('reportText');
+        const preview = document.getElementById('weeklyReportPreview');
+        preview.style.display = 'block';
+        textDiv.innerHTML = '<div class="dot-pulse"><span></span><span></span><span></span></div> Synthesis in progress...';
+        
+        fetch('/admin/generate-weekly-report')
+        .then(r => r.json())
+        .then(data => {
+            if(data.report) {
+                textDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: 'Inter', sans-serif;">${data.report}</pre>`;
+            } else {
+                textDiv.innerText = "Error generating report.";
+            }
+        });
+    }
+
+    // Map Layers
+    let currentLayer = 'real';
+    let realMarkers = [];
+    let predictMarkers = [];
+    let hotspotsMapInstance;
+
+    function toggleMapLayer(layer) {
+        currentLayer = layer;
+        document.getElementById('btnLayerReal').className = layer === 'real' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+        document.getElementById('btnLayerPredict').className = layer === 'predict' ? 'btn btn-sm btn-primary' : 'btn btn-sm btn-outline';
+        
+        // Hide/Show layers
+        realMarkers.forEach(m => layer === 'real' ? m.addTo(hotspotsMapInstance) : hotspotsMapInstance.removeLayer(m));
+        predictMarkers.forEach(m => layer === 'predict' ? m.addTo(hotspotsMapInstance) : hotspotsMapInstance.removeLayer(m));
+    }
+
 document.addEventListener('DOMContentLoaded', function() {
-    var map = L.map('civicMap').setView([20.5937, 78.9629], 5);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    // Hotspots Map
+    hotspotsMapInstance = L.map('hotspotsMap').setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
         attribution: '&copy; OpenStreetMap &copy; CARTO'
-    }).addTo(map);
+    }).addTo(hotspotsMapInstance);
+
+    // Health Heatmap
+    const healthMapInstance = L.map('healthHeatmap').setView([20.5937, 78.9629], 5);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(healthMapInstance);
 
     fetch('/api/map-data')
     .then(r => r.json())
     .then(data => {
-        if(data && data.length > 0) {
-            let bounds = [];
-            data.forEach(c => {
-                let color = '#10b981'; // Green (Low)
-                if (c.priority === 'High' || c.priority === 'Urgent') color = '#ef4444'; // Red
-                else if (c.priority === 'Medium') color = '#f59e0b'; // Orange
-                
-                let marker = L.circleMarker([c.lat, c.lng], {
-                    radius: 8,
-                    fillColor: color,
-                    color: '#fff',
-                    weight: 1,
-                    opacity: 0.3,
-                    fillOpacity: 0.8
-                }).addTo(map);
-                marker.bindPopup(`<b>#${c.id} ${c.category}</b><br>Priority: ${c.priority}<br>Status: ${c.status}`);
-                bounds.push([c.lat, c.lng]);
+        data.forEach(c => {
+            let color = '#10b981';
+            if (c.priority === 'High' || c.priority === 'Urgent') color = '#ef4444';
+            else if (c.priority === 'Medium') color = '#f59e0b';
+            
+            let marker = L.circleMarker([c.lat, c.lng], {
+                radius: 8, fillColor: color, color: '#fff', weight: 1, opacity: 0.3, fillOpacity: 0.8
             });
-            if (bounds.length > 0) map.fitBounds(bounds, {padding: [30,30]});
-        }
+            marker.bindPopup(`<b>#${c.id} ${c.category}</b><br>Priority: ${c.priority}<br>Status: ${c.status}`);
+            realMarkers.push(marker);
+            marker.addTo(hotspotsMapInstance);
+        });
     });
+
+    fetch('/api/hotspots')
+    .then(r => r.json())
+    .then(data => {
+        data.forEach(p => {
+            let marker = L.circle([p.lat, p.lng], {
+                radius: 500, color: '#6366f1', fillColor: '#6366f1', fillOpacity: 0.4
+            });
+            marker.bindPopup(`<b>Predicted Hotspot</b><br>Confidence: ${p.probability}%<br>Category: ${p.category}`);
+            predictMarkers.push(marker);
+        });
+    });
+
+    // Fetch Heatmap Data
+    fetch('/api/city-twin/heatmap')
+    .then(r => r.json())
+    .then(data => {
+        L.heatLayer(data, {
+            radius: 25,
+            blur: 15,
+            maxZoom: 17,
+            gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
+        }).addTo(healthMapInstance);
+    });
+
+    fetchViralAlerts();
 });
 </script>
 {% endblock %}

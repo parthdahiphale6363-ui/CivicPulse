@@ -30,13 +30,37 @@ if (navToggle && navMenu) {
     });
 
     // Close menu on link click
-    document.querySelectorAll('.nav-link').forEach(link => {
+    document.querySelectorAll('.nav-link:not(.nav-dropdown-toggle)').forEach(link => {
         link.addEventListener('click', () => {
             navMenu.classList.remove('active');
             navToggle.classList.remove('active');
         });
     });
 }
+
+// ---------- Nav Dropdown Toggle (for touch / mobile) ----------
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.nav-dropdown-toggle').forEach(toggle => {
+        toggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const dropdown = toggle.closest('.nav-dropdown');
+            // Close other dropdowns
+            document.querySelectorAll('.nav-dropdown.active').forEach(d => {
+                if (d !== dropdown) d.classList.remove('active');
+            });
+            dropdown.classList.toggle('active');
+        });
+    });
+
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.nav-dropdown')) {
+            document.querySelectorAll('.nav-dropdown.active').forEach(d => {
+                d.classList.remove('active');
+            });
+        }
+    });
+});
 
 // ---------- Scroll Reveal Animations ----------
 function initScrollReveal() {
@@ -179,21 +203,21 @@ function sendChatMessage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: message })
     })
-    .then(res => res.json())
-    .then(data => {
-        removeTypingIndicator(typingId);
-        addChatMessage(data.response, 'ai');
-        chatSendBtn.disabled = false;
+        .then(res => res.json())
+        .then(data => {
+            removeTypingIndicator(typingId);
+            addChatMessage(data.response, 'ai');
+            chatSendBtn.disabled = false;
 
-        // Hide suggestions after first message
-        const suggestions = document.querySelector('.chat-suggestions');
-        if (suggestions) suggestions.style.display = 'none';
-    })
-    .catch(err => {
-        removeTypingIndicator(typingId);
-        addChatMessage('Sorry, I encountered an error. Please try again.', 'ai');
-        chatSendBtn.disabled = false;
-    });
+            // Hide suggestions after first message
+            const suggestions = document.querySelector('.chat-suggestions');
+            if (suggestions) suggestions.style.display = 'none';
+        })
+        .catch(err => {
+            removeTypingIndicator(typingId);
+            addChatMessage('Sorry, I encountered an error. Please try again.', 'ai');
+            chatSendBtn.disabled = false;
+        });
 }
 
 function addChatMessage(text, type) {
@@ -221,8 +245,10 @@ function addChatMessage(text, type) {
 }
 
 function formatAIResponse(text) {
+    if (!text) return '';
     // Convert markdown-like formatting to HTML
     return text
+        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="chat-link">$1</a>')
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/\n- /g, '<br>• ')

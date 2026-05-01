@@ -2,64 +2,126 @@
 {% block title %}My Profile — CivicPulse{% endblock %}
 
 {% block content %}
-<div class="profile-page">
-    <div class="profile-header reveal">
-        <div class="profile-avatar">
-            <i class="fas fa-user"></i>
+<div class="profile-page" style="max-width: 900px; margin: 0 auto; padding: 40px 24px;">
+    
+    <!-- Profile Hero Card -->
+    <div class="profile-hero reveal" style="background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; text-align: center; position: relative; overflow: hidden; margin-bottom: 32px;">
+        <!-- Decorative gradient blob -->
+        <div style="position: absolute; top: -60px; right: -60px; width: 180px; height: 180px; border-radius: 50%; background: radial-gradient(circle, rgba(5, 150, 105, 0.15), transparent); pointer-events: none;"></div>
+        <div style="position: absolute; bottom: -40px; left: -40px; width: 140px; height: 140px; border-radius: 50%; background: radial-gradient(circle, rgba(245, 158, 11, 0.1), transparent); pointer-events: none;"></div>
+        
+        <div class="profile-avatar-large" style="width: 90px; height: 90px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 800; color: white; margin: 0 auto 20px; box-shadow: 0 8px 30px rgba(5, 150, 105, 0.3); border: 3px solid rgba(255,255,255,0.1);">
+            {{ username[0]|upper if username else 'U' }}
         </div>
-        <h2>{{ username }}</h2>
-        <p style="color: var(--text-secondary);">Welcome to your profile</p>
-        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
-            <div
-                style="background: rgba(99,102,241,0.1); padding: 8px 16px; border-radius: var(--radius-full); font-size: 13px;">
-                <i class="fas fa-clipboard-list" style="color: var(--primary-light);"></i>
-                {{ total_filed }} Complaints Filed
+        
+        <h2 style="font-size: 26px; font-weight: 800; margin-bottom: 4px; background: var(--gradient-primary); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">{{ username }}</h2>
+        <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 24px;">
+            {% if user_role == 'admin' %}
+                <i class="fas fa-shield-alt" style="color: var(--primary-light);"></i> Administrator
+            {% else %}
+                <i class="fas fa-user-check" style="color: var(--primary-light);"></i> Active Citizen
+            {% endif %}
+        </p>
+
+        <!-- Stats Row -->
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <div style="background: rgba(255, 255, 255, 0.05); padding: 12px 24px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.1); min-width: 120px;">
+                <div style="font-size: 28px; font-weight: 900; color: #ffffff;">{{ total_filed }}</div>
+                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Filed</div>
             </div>
-            <div
-                style="background: rgba(16,185,129,0.1); padding: 8px 16px; border-radius: var(--radius-full); font-size: 13px;">
-                <i class="fas fa-check-circle" style="color: var(--success);"></i>
-                {{ total_resolved }} Resolved
+            <div style="background: rgba(255, 255, 255, 0.08); padding: 12px 24px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.15); min-width: 120px;">
+                <div style="font-size: 28px; font-weight: 900; color: var(--success);">{{ total_resolved }}</div>
+                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Resolved</div>
             </div>
-            <div
-                style="background: rgba(245,158,11,0.1); padding: 8px 16px; border-radius: var(--radius-full); font-size: 13px;">
-                <i class="fas fa-clock" style="color: var(--warning);"></i>
-                {{ total_pending }} Pending
+            <div style="background: rgba(255, 255, 255, 0.03); padding: 12px 24px; border-radius: var(--radius-md); border: 1px solid rgba(255, 255, 255, 0.06); min-width: 120px;">
+                <div style="font-size: 28px; font-weight: 900; color: var(--warning);">{{ total_pending }}</div>
+                <div style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 2px;">Pending</div>
             </div>
+        </div>
+
+        <!-- Trust & Streak Bar -->
+        <div style="display: flex; gap: 12px; justify-content: center; margin-top: 20px; flex-wrap: wrap;">
+            {% if g_streak_days %}
+            <span style="background: rgba(245, 158, 11, 0.12); color: #fbbf24; padding: 6px 16px; border-radius: var(--radius-full); font-size: 13px; font-weight: 700; border: 1px solid rgba(245, 158, 11, 0.25);">
+                🔥 {{ g_streak_days }} Day Streak
+            </span>
+            {% endif %}
+            <span style="background: rgba(255, 255, 255, 0.05); color: var(--text-primary); padding: 6px 16px; border-radius: var(--radius-full); font-size: 13px; font-weight: 700; border: 1px solid rgba(255, 255, 255, 0.15);">
+                <i class="fas fa-star"></i> {{ g_trust_score|default(100) }} Trust Score
+            </span>
         </div>
     </div>
 
-    <div style="margin-bottom: 24px;" class="reveal">
-        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 16px;">
+    <!-- Quick Actions -->
+    <div class="reveal" style="display: flex; gap: 12px; margin-bottom: 32px; flex-wrap: wrap;">
+        <a href="/report" class="btn btn-primary" style="flex: 1; justify-content: center; min-width: 160px;">
+            <i class="fas fa-plus"></i> Report Problem
+        </a>
+        <a href="/complaints" class="btn btn-outline" style="flex: 1; justify-content: center; min-width: 160px;">
+            <i class="fas fa-list-alt"></i> All Complaints
+        </a>
+        <a href="/ai-chat" class="btn btn-outline" style="flex: 1; justify-content: center; min-width: 160px; color: var(--accent); border-color: rgba(245, 158, 11, 0.3);">
+            <i class="fas fa-robot"></i> Ask AI
+        </a>
+    </div>
+
+    <!-- My Complaints Section -->
+    <div class="reveal" style="margin-bottom: 16px;">
+        <h3 style="font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 10px;">
             <i class="fas fa-history" style="color: var(--primary-light);"></i> My Complaints
+            <span style="font-size: 12px; background: rgba(5, 150, 105, 0.12); color: var(--primary-light); padding: 2px 10px; border-radius: var(--radius-full); font-weight: 600;">{{ total_filed }}</span>
         </h3>
     </div>
 
     {% if user_complaints %}
-    <div class="complaint-list">
+    <div class="complaint-list" style="display: flex; flex-direction: column; gap: 12px;">
         {% for c in user_complaints %}
-        <a href="/complaint/{{ c.id }}" class="complaint-item reveal" style="text-decoration: none; color: inherit;">
-            <span
-                class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
-                {{ c.category or 'Other' }}
-            </span>
-            <div class="complaint-info">
-                <h4>{{ c.description[:80] }}{% if c.description|length > 80 %}...{% endif %}</h4>
-                <p>{{ c.created_at or 'Recently' }} {% if c.location %}· {{ c.location }}{% endif %}</p>
+        <a href="/complaint/{{ c.id }}" class="complaint-card-item reveal" style="display: flex; align-items: center; gap: 16px; padding: 18px 20px; background: var(--gradient-card); border: 1px solid var(--border); border-radius: var(--radius-md); text-decoration: none; color: inherit; transition: all 0.3s ease;">
+            <div style="width: 44px; height: 44px; border-radius: var(--radius-sm); background: rgba(5, 150, 105, 0.1); display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <span style="font-size: 20px;">
+                    {% if c.category == 'Pothole' %}🕳️
+                    {% elif c.category == 'Garbage' %}🗑️
+                    {% elif c.category == 'Water Leakage' %}💧
+                    {% elif c.category == 'Streetlight' %}💡
+                    {% elif c.category == 'Sewage' %}🚰
+                    {% elif c.category == 'Road Damage' %}🛣️
+                    {% elif c.category == 'Traffic Signal' %}🚦
+                    {% elif c.category == 'Noise Pollution' %}🔊
+                    {% else %}📝{% endif %}
+                </span>
             </div>
-            <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
-            <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+            <div style="flex: 1; min-width: 0;">
+                <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    {{ c.description[:70] }}{% if c.description|length > 70 %}...{% endif %}
+                </div>
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
+                    {{ c.created_at[:10] if c.created_at else 'Recently' }} · {{ c.category or 'Other' }}
+                    {% if c.location %} · {{ c.location[:25] }}{% if c.location|length > 25 %}...{% endif %}{% endif %}
+                </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-shrink: 0; align-items: center;">
+                <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+                <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+            </div>
         </a>
         {% endfor %}
     </div>
     {% else %}
-    <div class="empty-state reveal">
-        <i class="fas fa-inbox"></i>
-        <h3>No Complaints Yet</h3>
-        <p>You haven't filed any complaints yet. Start by reporting a problem!</p>
-        <a href="/report" class="btn btn-primary" style="margin-top: 20px;">
+    <div class="empty-state reveal" style="text-align: center; padding: 60px 20px; background: var(--gradient-card); border: 1px dashed var(--border); border-radius: var(--radius-lg);">
+        <i class="fas fa-inbox" style="font-size: 48px; color: var(--text-muted); margin-bottom: 16px; display: block;"></i>
+        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 8px;">No Complaints Yet</h3>
+        <p style="color: var(--text-muted); margin-bottom: 24px;">You haven't filed any complaints yet. Help improve your community!</p>
+        <a href="/report" class="btn btn-primary" style="display: inline-flex;">
             <i class="fas fa-plus"></i> Report a Problem
         </a>
     </div>
     {% endif %}
+
+    <!-- Logout Button at Bottom -->
+    <div class="reveal" style="text-align: center; margin-top: 40px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05);">
+        <a href="/logout" class="btn btn-outline" style="color: var(--danger); border-color: rgba(239, 68, 68, 0.3);">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
 </div>
 {% endblock %}

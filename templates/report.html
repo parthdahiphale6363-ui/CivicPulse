@@ -34,9 +34,18 @@
             <div class="form-group">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <label><i class="fas fa-align-left"></i> Description</label>
-                    <button type="button" class="btn-ai-enhance" id="enhanceDescBtn" onclick="enhanceDescription()">
-                        <i class="fas fa-magic"></i> AI Enhance
-                    </button>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" class="btn-ai-enhance" id="voiceBtn" onclick="toggleVoiceRecording()" style="background: rgba(239, 68, 68, 0.1); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.2);">
+                            <i class="fas fa-microphone"></i> <span id="voiceBtnText">Record Voice</span>
+                        </button>
+                        <button type="button" class="btn-ai-enhance" id="enhanceDescBtn" onclick="enhanceDescription()">
+                            <i class="fas fa-magic"></i> AI Enhance
+                        </button>
+                    </div>
+                </div>
+                <div id="voiceRecordingWave" style="display: none; align-items: center; gap: 10px; margin: 10px 0; padding: 10px; background: rgba(239, 68, 68, 0.05); border-radius: var(--radius-sm);">
+                    <div class="dot-pulse" style="width: 40px;"><span style="background: var(--danger);"></span><span style="background: var(--danger);"></span><span style="background: var(--danger);"></span></div>
+                    <span style="color: var(--danger); font-size: 13px; font-weight: 600;">Recording your voice... (Click again to stop)</span>
                 </div>
                 <textarea name="description" id="descriptionInput" placeholder="Describe the problem in detail. The more details, the better our AI can analyze it..." required rows="4"></textarea>
                 <div class="ai-enhance-status" id="descEnhanceStatus"></div>
@@ -94,8 +103,22 @@
                 </div>
             </div>
 
+            <!-- ANONYMOUS TOGGLE -->
+            <div class="form-group" style="background: rgba(15, 23, 42, 0.5); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border); margin-top: 25px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <div>
+                        <h4 style="color: var(--text-primary); font-size: 15px; margin-bottom: 4px;"><i class="fas fa-user-secret" style="margin-right: 8px; color: var(--primary-light);"></i> Report Anonymously</h4>
+                        <p style="font-size: 11px; color: var(--text-muted); line-height: 1.4;">Hide your identity publicly. Admins can still see your details for verification.</p>
+                    </div>
+                    <label class="switch" style="position: relative; display: inline-block; width: 50px; height: 26px;">
+                        <input type="checkbox" name="is_anonymous" style="opacity: 0; width: 0; height: 0;">
+                        <span class="slider-anon round" style="position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: rgba(255,255,255,0.1); transition: .4s; border-radius: 34px;"></span>
+                    </label>
+                </div>
+            </div>
+
             <!-- EMERGENCY / SOS TOGGLE -->
-            <div class="form-group" style="background: rgba(239, 68, 68, 0.05); padding: 20px; border-radius: var(--radius-md); border: 2px solid rgba(239, 68, 68, 0.2); margin-top: 25px;">
+            <div class="form-group" style="background: rgba(239, 68, 68, 0.05); padding: 20px; border-radius: var(--radius-md); border: 2px solid rgba(239, 68, 68, 0.2); margin-top: 15px;">
                 <div style="display: flex; align-items: center; justify-content: space-between;">
                     <div>
                         <h4 style="color: var(--danger); font-size: 15px; margin-bottom: 4px;"><i class="fas fa-biohazard fa-spin" style="margin-right: 8px;"></i> SOS / Immediate Danger</h4>
@@ -109,9 +132,11 @@
             </div>
 
 <style>
-.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
+.slider:before, .slider-anon:before { position: absolute; content: ""; height: 18px; width: 18px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
 input:checked + .slider { background-color: var(--danger); box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
 input:checked + .slider:before { transform: translateX(24px); }
+input:checked + .slider-anon { background-color: var(--primary); box-shadow: 0 0 15px rgba(59, 130, 246, 0.4); }
+input:checked + .slider-anon:before { transform: translateX(24px); }
 </style>
 
 <script>
@@ -184,9 +209,12 @@ function getCurrentLocation() {
                 </span>
             </div>
 
-            <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;" id="submitBtn">
-                <i class="fas fa-paper-plane"></i> Submit Complaint
-            </button>
+            <div class="magnetic-wrap" style="width: 100%;">
+                <button type="submit" class="btn btn-primary btn-submit-animate" style="width: 100%; justify-content: center;" id="submitBtn">
+                    <span class="btn-text"><i class="fas fa-paper-plane"></i> Submit Complaint</span>
+                    <span class="btn-loader" style="display: none;"><i class="fas fa-circle-notch fa-spin"></i> Analyzing Evidence...</span>
+                </button>
+            </div>
         </form>
 
         <div class="form-footer">
@@ -214,7 +242,91 @@ document.getElementById('categorySelect').addEventListener('change', function() 
     badge.className = 'priority-badge priority-' + priority.toLowerCase();
 });
 
-// AI Enhance Description
+// --- Multilingual Voice Recording Logic ---
+let mediaRecorder;
+let audioChunks = [];
+let isRecording = false;
+
+function toggleVoiceRecording() {
+    const btn = document.getElementById('voiceBtn');
+    const text = document.getElementById('voiceBtnText');
+    const wave = document.getElementById('voiceRecordingWave');
+    const status = document.getElementById('descEnhanceStatus');
+
+    if (!isRecording) {
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = sendVoiceData;
+                
+                mediaRecorder.start();
+                isRecording = true;
+                btn.style.background = "var(--danger)";
+                btn.style.color = "white";
+                text.innerText = "Stop Recording";
+                wave.style.display = 'flex';
+                status.innerHTML = '<span style="color: var(--danger);"><i class="fas fa-circle fa-beat"></i> Listening carefully... Speak in any language.</span>';
+            })
+            .catch(err => {
+                console.error("Mic error:", err);
+                status.innerHTML = '<span style="color: var(--danger);">Microphone access denied.</span>';
+            });
+    } else {
+        mediaRecorder.stop();
+        isRecording = false;
+        btn.style.background = "rgba(239, 68, 68, 0.1)";
+        btn.style.color = "var(--danger)";
+        text.innerText = "Processing...";
+        wave.style.display = 'none';
+        btn.disabled = true;
+    }
+}
+
+function sendVoiceData() {
+    const status = document.getElementById('descEnhanceStatus');
+    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+    const formData = new FormData();
+    formData.append('audio', audioBlob);
+
+    status.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-robot"></i> Groq AI is transcribing your regional audio...</span>';
+
+    fetch('/api/voice-report', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(data => {
+        const btn = document.getElementById('voiceBtn');
+        const text = document.getElementById('voiceBtnText');
+        btn.disabled = false;
+        text.innerText = "Record Voice";
+
+        if (data.clean_description) {
+            document.getElementById('descriptionInput').value = data.clean_description;
+            if (data.category) {
+                const select = document.getElementById('categorySelect');
+                for(let i=0; i<select.options.length; i++) {
+                    if(select.options[i].value.includes(data.category)) {
+                        select.selectedIndex = i;
+                        select.dispatchEvent(new Event('change'));
+                        break;
+                    }
+                }
+            }
+            status.innerHTML = `<span style="color: var(--success);"><i class="fas fa-check-circle"></i> Transcribed: "${data.native_transcript.substring(0, 50)}..."</span>`;
+        } else {
+            status.innerHTML = `<span style="color: var(--danger);">${data.error || 'Transcription failed.'}</span>`;
+        }
+    })
+    .catch(e => {
+        console.error(e);
+        status.innerHTML = '<span style="color: var(--danger);">Network error in voice processing.</span>';
+        document.getElementById('voiceBtn').disabled = false;
+        document.getElementById('voiceBtnText').innerText = "Record Voice";
+    });
+}
 function enhanceDescription() {
     const desc = document.getElementById('descriptionInput').value.trim();
     const btn = document.getElementById('enhanceDescBtn');
@@ -387,5 +499,19 @@ function validateVideo(input) {
         video.src = URL.createObjectURL(file);
     }
 }
+document.getElementById('reportForm').addEventListener('submit', function(e) {
+    const btn = document.getElementById('submitBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnLoader = btn.querySelector('.btn-loader');
+    
+    btn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoader.style.display = 'inline-block';
+    
+    // Add submission ripple 
+    const ripple = document.createElement('div');
+    ripple.className = 'submit-ripple';
+    btn.appendChild(ripple);
+});
 </script>
 {% endblock %}

@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+{% block title %}CivicIQ | Instant AI City Scanner{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --iq-primary: #6366f1;
+        --iq-accent: #06b6d4;
+        --iq-danger: #f43f5e;
+        --iq-success: #10b981;
+        --iq-warning: #f59e0b;
+        --bg-darker: #050810;
+        --glass: rgba(15, 23, 42, 0.4);
+        --border-glass: rgba(255, 255, 255, 0.08);
+        --glow: rgba(99, 102, 241, 0.2);
+    }
+
+    .civiciq-container {
+        padding: 60px 20px;
+        max-width: 1200px;
+        margin: 0 auto;
+        min-height: 80vh;
+        color: white;
+        position: relative;
+    }
+
+    /* Cinematic Scanline Effect */
+    .scanline {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100%; height: 100px;
+        background: linear-gradient(to bottom, transparent, var(--glow), transparent);
+        opacity: 0.1;
+        pointer-events: none;
+        z-index: 10;
+        animation: scanlineAnim 6s infinite linear;
+    }
+
+    @keyframes scanlineAnim {
+        0% { transform: translateY(-100%); }
+        100% { transform: translateY(100vh); }
+    }
+
+    /* Set a dark background for this specific page if base.html is light */
+    main {
+        background: var(--bg-darker);
+    }
+
+    /* Hero Section */
+    .hero-scanner {
+        text-align: center;
+        margin-bottom: 60px;
+        animation: fadeInUp 0.8s ease-out;
+        position: relative;
+    }
+
+    .hero-scanner::before {
+        content: '';
+        position: absolute;
+        width: 300px;
+        height: 300px;
+        background: url('/static/images/civic_iq_bg.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        opacity: 0.15;
+        top: -100px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: -1;
+        filter: blur(20px);
+    }
+
+    .hero-scanner h1 {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 3.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--iq-primary), var(--iq-accent));
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 20px;
+    }
+
+    .hero-scanner p {
+        font-size: 1.2rem;
+        color: #94a3b8; /* Explicit light grey */
+        max-width: 600px;
+        margin: 0 auto 40px;
+    }
+
+    .search-orb {
+        background: var(--glass);
+        backdrop-filter: blur(25px);
+        border: 1px solid var(--border-glass);
+        padding: 15px;
+        border-radius: 100px;
+        display: flex;
+        align-items: center;
+        max-width: 650px;
+        margin: 0 auto;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+        transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .search-orb:hover {
+        box-shadow: 0 0 30px rgba(99, 102, 241, 0.3);
+        transform: translateY(-5px);
+    }
+
+    .search-orb:focus-within {
+        transform: scale(1.05);
+        border-color: var(--iq-primary);
+        box-shadow: 0 0 30px rgba(99, 102, 241, 0.2);
+    }
+
+    .search-orb input {
+        background: transparent;
+        border: none;
+        color: white;
+        padding: 10px 30px;
+        flex: 1;
+        font-size: 1.2rem;
+        outline: none;
+    }
+    .search-orb input::placeholder {
+        color: rgba(255, 255, 255, 0.4);
+    }
+
+    .scan-btn {
+        background: linear-gradient(90deg, var(--iq-primary), var(--iq-accent));
+        border: none;
+        color: white;
+        padding: 15px 40px;
+        border-radius: 100px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        transition: 0.3s;
+    }
+
+    .scan-btn:hover {
+        filter: brightness(1.2);
+        box-shadow: 0 0 20px var(--iq-primary);
+    }
+
+    /* Scanning State */
+    #scanning-loader {
+        display: none;
+        text-align: center;
+        margin: 50px 0;
+    }
+
+    .deep-scan-radar {
+        width: 150px;
+        height: 150px;
+        border: 2px solid var(--iq-primary);
+        border-radius: 50%;
+        margin: 0 auto 30px;
+        position: relative;
+        animation: radarPulse 2s infinite linear;
+    }
+
+    .deep-scan-radar::after {
+        content: '';
+        position: absolute;
+        width: 100%; height: 2px;
+        background: var(--iq-primary);
+        top: 50%; left: 0;
+        animation: radarSweep 2s infinite linear;
+    }
+
+    @keyframes radarPulse {
+        0% { transform: scale(0.8); opacity: 0.5; box-shadow: 0 0 0 rgba(99, 102, 241, 0.4); }
+        100% { transform: scale(1.2); opacity: 0; box-shadow: 0 0 50px rgba(99, 102, 241, 0.8); }
+    }
+
+    /* Report Card Styles */
+    #report-content {
+        display: none;
+        animation: fadeInUp 1s ease-out;
+    }
+
+    .report-grid {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 30px;
+    }
+
+    .header-card {
+        background: var(--glass);
+        backdrop-filter: blur(30px);
+        border: 1px solid var(--border-glass);
+        border-radius: 30px;
+        padding: 50px;
+        text-align: center;
+        grid-column: 1 / 3;
+        display: flex;
+        align-items: center;
+        justify-content: space-around;
+        box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .header-card::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(135deg, transparent, rgba(255,255,255,0.05), transparent);
+        transform: translateX(-100%);
+        transition: 0.8s;
+    }
+
+    .header-card:hover::after {
+        transform: translateX(100%);
+    }
+
+    .health-grade-box {
+        width: 130px;
+        height: 130px;
+        background: var(--grade-color, var(--iq-primary));
+        border-radius: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 4rem;
+        font-weight: 900;
+        color: black;
+        box-shadow: 0 0 50px var(--grade-color, var(--iq-primary)), inset 0 0 20px rgba(255,255,255,0.4);
+        animation: activePulse 3s infinite ease-in-out;
+        transform: rotate(-5deg);
+    }
+
+    @keyframes activePulse {
+        0%, 100% { transform: rotate(-5deg) scale(1); filter: brightness(1); }
+        50% { transform: rotate(5deg) scale(1.1); filter: brightness(1.3); }
+    }
+
+    .problem-card {
+        background: var(--glass);
+        backdrop-filter: blur(30px);
+        border: 1px solid var(--border-glass);
+        border-radius: 20px;
+        padding: 30px;
+        margin-bottom: 25px;
+        transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        opacity: 0;
+        transform: translateY(30px);
+    }
+
+    .problem-card.show {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    .problem-card:hover {
+        border-color: var(--iq-accent);
+        transform: translateY(-8px) scale(1.02);
+        box-shadow: 0 15px 40px rgba(0,0,0,0.4), 0 0 20px var(--glow);
+    }
+
+    .dept-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255,255,255,0.05);
+        padding: 6px 16px;
+        border-radius: 100px;
+        font-size: 11px;
+        font-weight: 700;
+        margin-bottom: 15px;
+        color: var(--iq-accent);
+        border: 1px solid rgba(255,255,255,0.1);
+    }
+    .contact-badge {
+        background: var(--iq-success);
+        color: black;
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-size: 10px;
+        text-decoration: none;
+    }
+    .contact-badge:hover {
+        background: white;
+    }
+
+    .rti-box {
+        background: rgba(0,0,0,0.4);
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px dashed var(--border-glass);
+        margin-top: 15px;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 13px;
+        line-height: 1.5;
+        max-height: 150px;
+        overflow-y: auto;
+        position: relative;
+    }
+
+    .copy-rti {
+        position: absolute;
+        top: 10px; right: 10px;
+        background: var(--iq-primary);
+        border: none;
+        color: white;
+        padding: 5px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+        font-family: 'Outfit', sans-serif;
+    }
+
+    /* Escalation Matrix */
+    .escalation-step {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 20px;
+        padding-left: 20px;
+        border-left: 2px solid var(--border-glass);
+        position: relative;
+    }
+
+    .escalation-step::before {
+        content: '';
+        position: absolute;
+        left: -6px; top: 0;
+        width: 10px; height: 10px;
+        background: var(--iq-primary);
+        border-radius: 50%;
+    }
+
+    .directory-list {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .directory-item {
+        background: rgba(255, 255, 255, 0.05);
+        padding: 12px 16px;
+        border-radius: 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border: 1px solid var(--border-glass);
+        transition: 0.3s;
+    }
+
+    .directory-item:hover {
+        background: rgba(99, 102, 241, 0.1);
+        border-color: var(--iq-primary);
+    }
+
+    @keyframes radarSweep {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+    }
+
+    .panel {
+        background: var(--glass);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border-glass);
+        padding: 24px;
+        border-radius: 20px;
+    }
+
+    .section-title {
+        color: white !important;
+        font-family: 'Space Grotesk', sans-serif;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+
+    /* Ensure all text within cards/panels is readable */
+    .header-card p, .problem-card p, .problem-card div, .panel p {
+        color: rgba(255, 255, 255, 0.8) !important;
+    }
+
+    .problem-card h4 {
+        color: white !important;
+    }
+
+    .civiciq-container h1, 
+    .civiciq-container h2, 
+    .civiciq-container h3, 
+    .civiciq-container h4, 
+    .civiciq-container h5 {
+        color: white !important;
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="scanline"></div>
+<div class="civiciq-container">
+    <div class="hero-scanner">
+        <h1>CivicIQ Scan</h1>
+        <p>Instant municipal intelligence. Type any city in India to uncover its civic health, legal rights, and hidden roadblocks.</p>
+        
+        <div class="search-orb">
+            <input type="text" id="cityInput" placeholder="Enter City Name (e.g., Pune, Nashik, Bangaluru)" onkeypress="if(event.key === 'Enter') startScan()">
+            <button class="scan-btn" onclick="startScan()">
+                <i class="fas fa-satellite-dish"></i> SCAN CITY
+            </button>
+        </div>
+    </div>
+
+    <!-- Loader -->
+    <div id="scanning-loader">
+        <div class="deep-scan-radar"></div>
+        <h3>DEEP SCAN IN PROGRESS...</h3>
+        <p id="loader-status" style="color: var(--text-dim);">Accessing National Civic Database & Groq Intelligence...</p>
+    </div>
+
+    <!-- Results Content -->
+    <div id="report-content">
+        <div class="header-card" id="report-header">
+            <!-- Dynamic Content -->
+        </div>
+
+        <div class="report-grid">
+            <div id="problems-column">
+                <h3 class="section-title" style="margin-bottom: 25px;"><i class="fas fa-exclamation-triangle"></i> TOP 5 PREDICTED CHALLENGES</h3>
+                <div id="problems-list"></div>
+            </div>
+
+            <div>
+                <div class="panel" style="margin-bottom: 30px;">
+                    <h3 class="section-title"><i class="fas fa-phone-square-alt"></i> UNIVERSAL CITY DIRECTORY</h3>
+                    <div id="city-directory" class="directory-list" style="margin-top: 20px;">
+                        <!-- Populate via JS -->
+                    </div>
+                </div>
+
+                <div class="panel" style="margin-bottom: 30px;">
+                    <h3 class="section-title"><i class="fas fa-sitemap"></i> ESCALATION MATRIX</h3>
+                    <div id="escalation-matrix" style="margin-top: 20px;"></div>
+                </div>
+
+                <div class="panel">
+                    <h3 class="section-title"><i class="fas fa-balance-scale"></i> CONSTITUTIONAL EMPOWERMENT</h3>
+                    <p style="font-size: 14px; margin-top: 15px; line-height: 1.6; color: rgba(255,255,255,0.7);">
+                        Under Article 21 (Right to Health & Environment) and Article 19 (Right to Information), every citizen has the power to hold municipal bodies accountable. RTI is your primary weapon for transparency.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function startScan() {
+        const city = document.getElementById('cityInput').value.trim();
+        if (!city) return alert("Please enter a city name.");
+
+        const loader = document.getElementById('scanning-loader');
+        const content = document.getElementById('report-content');
+        const hero = document.querySelector('.hero-scanner');
+
+        hero.style.opacity = '0.3';
+        loader.style.display = 'block';
+        content.style.display = 'none';
+
+        try {
+            const res = await fetch('/api/civic-iq/scan', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ city })
+            });
+            const data = await res.json();
+
+            if (data.error) throw new Error(data.error);
+
+            renderReport(data);
+            
+            loader.style.display = 'none';
+            hero.style.display = 'none';
+            content.style.display = 'block';
+
+        } catch (e) {
+            alert(e.message);
+            loader.style.display = 'none';
+            hero.style.opacity = '1';
+        }
+    }
+
+    function renderReport(data) {
+        const header = document.getElementById('report-header');
+        const gradeColor = data.grade === 'A' ? '#10b981' : (data.grade === 'B' ? '#6366f1' : (data.grade === 'C' ? '#f59e0b' : '#f43f5e'));
+        
+        header.innerHTML = `
+            <div style="text-align: left;">
+                <h2 style="font-family: 'Space Grotesk'; font-size: 3rem; font-weight: 800;">${data.city.toUpperCase()}</h2>
+                <p style="color: rgba(255,255,255,0.7); max-width: 500px;">${data.summary}</p>
+            </div>
+            <div style="text-align: center;">
+                <div class="health-grade-box" style="--grade-color: ${gradeColor}">${data.grade}</div>
+                <div style="margin-top: 15px; font-weight: 800; color: ${gradeColor}">CIVIC HEALTH: ${data.health_score}%</div>
+            </div>
+        `;
+
+        const problemsList = document.getElementById('problems-list');
+        problemsList.innerHTML = data.top_problems.map((p, i) => `
+            <div class="problem-card">
+                <div class="dept-tag">
+                    <i class="fas fa-building"></i> ${p.dept}
+                    <a href="tel:${p.contact_number}" class="contact-badge">
+                        <i class="fas fa-phone-alt"></i> ${p.contact_number}
+                    </a>
+                </div>
+                <h4 style="margin-bottom: 10px; font-size: 1.2rem;">${i+1}. ${p.issue}</h4>
+                <div style="font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 10px;">
+                    <i class="fas fa-gavel"></i> <b>Legal Right:</b> ${p.legal_rights}
+                </div>
+                <div style="font-size: 13px; color: var(--iq-accent); margin-bottom: 15px;">
+                    <i class="fas fa-directions"></i> <b>Action:</b> ${p.action_guide}
+                </div>
+                <button class="prime-btn" style="padding: 8px 15px; font-size: 11px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);" onclick="toggleRTI(${i})">
+                    <i class="fas fa-file-contract"></i> GENERATE RTI TEMPLATE
+                </button>
+                <div id="rti-${i}" class="rti-box" style="display: none;">
+                    <button class="copy-rti" onclick="copyRTI(${i})">COPY</button>
+                    <pre id="rti-text-${i}" style="white-space: pre-wrap;">${p.rti_template}</pre>
+                </div>
+            </div>
+        `).join('');
+
+        const matrix = document.getElementById('escalation-matrix');
+        matrix.innerHTML = data.escalation_matrix.map(m => `
+            <div class="escalation-step">
+                <div>
+                    <div style="font-weight: 800; font-size: 12px; color: var(--iq-primary);">${m.level}</div>
+                    <div style="font-size: 14px;">${m.entity}</div>
+                </div>
+            </div>
+        `).join('');
+
+        const directory = document.getElementById('city-directory');
+        directory.innerHTML = data.city_directory.map(d => `
+            <div class="directory-item">
+                <div style="font-size: 13px; font-weight: 600;">${d.dept}</div>
+                <a href="tel:${d.contact}" class="contact-badge" style="background: var(--iq-accent); font-size: 12px;">
+                    <i class="fas fa-phone-alt"></i> ${d.contact}
+                </a>
+            </div>
+        `).join('');
+
+        // Trigger staggered animations
+        setTimeout(() => {
+            document.querySelectorAll('.problem-card').forEach((card, i) => {
+                setTimeout(() => card.classList.add('show'), i * 150);
+            });
+        }, 100);
+    }
+
+    function toggleRTI(idx) {
+        const box = document.getElementById(`rti-${idx}`);
+        box.style.display = box.style.display === 'none' ? 'block' : 'none';
+        if (box.style.display === 'block') {
+            box.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+
+    function copyRTI(idx) {
+        const text = document.getElementById(`rti-text-${idx}`).innerText;
+        navigator.clipboard.writeText(text);
+        alert("RTI Template copied to clipboard! Ready to send.");
+    }
+
+    // Handle deep-linking: /civic-iq?city=Nashik
+    window.onload = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const city = urlParams.get('city');
+        if (city) {
+            document.getElementById('cityInput').value = city;
+            startScan();
+        }
+    };
+</script>
+{% endblock %}

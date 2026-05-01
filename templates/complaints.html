@@ -80,7 +80,7 @@
     {% endif %}
 
     {% if complaints %}
-    <div class="complaints-table-wrap reveal">
+    <div class="complaints-table-wrap reveal glass-premium" style="border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border);">
         <table class="complaints-table">
             <thead>
                 <tr>
@@ -95,9 +95,9 @@
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody class="stagger-container">
                 {% for c in complaints %}
-                <tr>
+                <tr class="stagger-item">
                     <td><strong>#{{ c.id }}</strong></td>
                     <td>
                         <span class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
@@ -113,7 +113,10 @@
                         {% if c.location %}{{ c.location[:30] }}{% if c.location|length > 30 %}...{% endif %}{% else %}<span style="color: var(--text-muted);">—</span>{% endif %}
                     </td>
                     <td>
-                        <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span class="pulse-indicator {{ c.priority|lower }}"></span>
+                            <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+                        </div>
                     </td>
                     <td>
                         <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
@@ -126,16 +129,16 @@
                     </td>
                     <td>
                         <div class="actions">
-                            <a href="/complaint/{{ c.id }}" class="btn btn-sm btn-outline" title="View Details">
+                            <a href="/complaint/{{ c.id }}" class="btn btn-sm btn-outline hover-lift" title="View Details">
                                 <i class="fas fa-eye"></i>
                             </a>
                             {% if user_role == 'admin' and c.status != 'Resolved' %}
-                            <a href="/resolve/{{ c.id }}" class="btn btn-sm btn-success" title="Resolve">
+                            <a href="/resolve/{{ c.id }}" class="btn btn-sm btn-success hover-lift" title="Resolve">
                                 <i class="fas fa-check"></i>
                             </a>
                             {% endif %}
                             {% if user_role == 'admin' %}
-                            <a href="/delete/{{ c.id }}" class="btn btn-sm btn-danger" title="Delete" onclick="return confirm('Are you sure?')">
+                            <a href="/delete/{{ c.id }}" class="btn btn-sm btn-danger hover-lift" title="Delete" onclick="return confirm('Are you sure?')">
                                 <i class="fas fa-trash"></i>
                             </a>
                             {% endif %}

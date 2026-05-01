@@ -56,14 +56,13 @@
                     <h3 style="color: var(--success); font-size: 15px; margin-bottom: 4px;"><i class="fas fa-clock"></i> AI Resolution Predictor</h3>
                     <p style="font-size: 12px; color: var(--text-secondary);" id="predText">Predicting timeframe and assigned department...</p>
                 </div>
-                </div>
                 <div style="text-align: right; min-width: 120px;" id="predStats">
                     <i class="fas fa-spinner fa-spin" style="color: var(--success);"></i>
                 </div>
             </div>
 
             <!-- AI IMPACT SCORE -->
-            <div class="detail-section" id="impactSection" style="background: rgba(192, 38, 211, 0.05); padding: 20px; border-radius: var(--radius-md); border: 1px dashed rgba(192, 38, 211, 0.3); display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px;">
+            <div class="detail-section" id="impactSection" style="background: rgba(5, 150, 105, 0.05); padding: 20px; border-radius: var(--radius-md); border: 1px dashed rgba(5, 150, 105, 0.3); display: flex; align-items: center; justify-content: space-between; margin-bottom: 25px;">
                 <div>
                     <h3 style="color: var(--primary-light); font-size: 15px; margin-bottom: 4px;"><i class="fas fa-bolt"></i> Civic Impact Score</h3>
                     <p style="font-size: 12px; color: var(--text-secondary);" id="impactText">Analyzing community severity, layout, and historical data...</p>
@@ -74,41 +73,67 @@
             </div>
 
             <!-- RESOLUTION ROADMAP (UNIQUE FEATURE) -->
-            <div class="detail-section roadmap-container" style="margin-bottom: 35px; background: rgba(15, 23, 42, 0.4); padding: 25px; border-radius: var(--radius-lg); border: 1px solid rgba(255,255,255,0.05);">
+            <div class="detail-section roadmap-container glass" style="margin-bottom: 35px; padding: 25px; border-radius: var(--radius-lg);">
                 <h3 style="margin-bottom: 25px; font-size: 16px; color: var(--text-secondary);"><i class="fas fa-route" style="color: var(--accent);"></i> Complaint Journey</h3>
-                <div class="roadmap" style="display: flex; justify-content: space-between; position: relative;">
-                    <div class="roadmap-line" style="position: absolute; top: 15px; left: 10%; right: 10%; height: 2px; background: rgba(255,255,255,0.1); z-index: 1;"></div>
-                    <div class="roadmap-line-progress" style="position: absolute; top: 15px; left: 10%; width: {{ (complaint.status_step - 1) * 40 }}%; height: 2px; background: var(--accent); z-index: 2; transition: width 1s ease;"></div>
+                <div class="roadmap" style="display: flex; justify-content: space-between; position: relative; padding: 0 10%;">
+                    <div class="roadmap-line" style="position: absolute; top: 16px; left: 10%; right: 10%; height: 2px; background: rgba(255,255,255,0.05); z-index: 1;"></div>
+                    <div class="roadmap-line-progress" style="position: absolute; top: 16px; left: 10%; width: {{ (complaint.status_step - 1) * 33.33 }}%; height: 2px; background: var(--gradient-primary); z-index: 2; transition: width 1.5s cubic-bezier(0.23, 1, 0.32, 1);"></div>
                     
                     <div class="roadmap-step {% if complaint.status_step >= 1 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
-                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 1 %}var(--accent){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a; transition: all 0.3s;">
+                        <div class="step-dot {% if complaint.status_step == 1 %}pulse-indicator active{% endif %}" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 1 %}var(--accent){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a; box-shadow: {% if complaint.status_step >= 1 %}0 0 15px var(--accent-glow){% else %}none{% endif %};">
                             <i class="fas fa-file-alt" style="font-size: 12px; color: white;"></i>
                         </div>
                         <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 1 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Filed</div>
                     </div>
                     
                     <div class="roadmap-step {% if complaint.status_step >= 2 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
-                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 2 %}var(--primary){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a;">
+                        <div class="step-dot {% if complaint.status_step == 2 %}pulse-indicator active{% endif %}" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 2 %}var(--primary){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a; box-shadow: {% if complaint.status_step >= 2 %}0 0 15px var(--primary-glow){% else %}none{% endif %};">
                             <i class="fas fa-tools" style="font-size: 12px; color: white;"></i>
                         </div>
                         <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 2 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Assigned</div>
                     </div>
-
+                    
                     <div class="roadmap-step {% if complaint.status_step >= 3 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
-                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 3 %}var(--warning){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a;">
+                        <div class="step-dot {% if complaint.status_step == 3 %}pulse-indicator active{% endif %}" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 3 %}var(--warning){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a; box-shadow: {% if complaint.status_step >= 3 %}0 0 15px rgba(245, 158, 11, 0.4){% else %}none{% endif %};">
                             <i class="fas fa-truck-pickup" style="font-size: 12px; color: white;"></i>
                         </div>
                         <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 3 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Dispatched</div>
                     </div>
-
+                    
                     <div class="roadmap-step {% if complaint.status_step >= 4 %}active{% endif %}" style="text-align: center; z-index: 3; flex: 1;">
-                        <div class="step-dot" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 4 %}var(--success){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a;">
+                        <div class="step-dot {% if complaint.status_step == 4 %}pulse-indicator active{% endif %}" style="width: 32px; height: 32px; background: {% if complaint.status_step >= 4 %}var(--success){% else %}#1e293b{% endif %}; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; border: 4px solid #0f172a; box-shadow: {% if complaint.status_step >= 4 %}0 0 15px rgba(16, 185, 129, 0.4){% else %}none{% endif %};">
                             <i class="fas fa-check" style="font-size: 12px; color: white;"></i>
                         </div>
                         <div style="font-size: 11px; font-weight: 700; color: {% if complaint.status_step >= 4 %}var(--text-primary){% else %}var(--text-muted){% endif %}; text-transform: uppercase;">Resolved</div>
                     </div>
                 </div>
             </div>
+
+            <!-- DYNAMIC CHRONOLOGICAL TIMELINE -->
+            {% if timeline %}
+            <div class="detail-section glass" style="margin-bottom: 35px; padding: 25px; border-radius: var(--radius-lg); border: 1px solid rgba(255,255,255,0.05);">
+                <h3 style="margin-bottom: 20px; font-size: 16px; color: var(--text-primary);"><i class="fas fa-history" style="color: var(--primary-light);"></i> Chronological Timeline</h3>
+                <div style="display: flex; flex-direction: column; gap: 15px; position: relative;">
+                    <!-- Vertical Line -->
+                    <div style="position: absolute; left: 15px; top: 10px; bottom: 10px; width: 2px; background: rgba(255,255,255,0.1);"></div>
+                    
+                    {% for event in timeline %}
+                    <div style="display: flex; gap: 15px; align-items: flex-start; z-index: 2; position: relative;">
+                        <div style="width: 32px; height: 32px; min-width: 32px; border-radius: 50%; background: var(--bg-dark); border: 2px solid {% if loop.last %}var(--success){% else %}var(--primary){% endif %}; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 10px {% if loop.last %}rgba(16, 185, 129, 0.3){% else %}rgba(59, 130, 246, 0.3){% endif %};">
+                            <i class="fas fa-check" style="font-size: 10px; color: {% if loop.last %}var(--success){% else %}var(--primary){% endif %};"></i>
+                        </div>
+                        <div style="background: rgba(15, 23, 42, 0.6); padding: 12px 16px; border-radius: var(--radius-md); border: 1px solid var(--border-light); flex: 1;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                <strong style="color: var(--text-primary); font-size: 14px;">Status: {{ event.status }}</strong>
+                                <span style="font-size: 12px; color: var(--text-muted);">{{ event.created_at }}</span>
+                            </div>
+                            <p style="color: var(--text-secondary); font-size: 13px; line-height: 1.5; margin: 0;">{{ event.notes }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
 
             <!-- Description -->
             <div class="detail-section">
@@ -214,16 +239,47 @@
 
             <!-- Deep AI Analysis Button -->
             <div class="detail-section">
-                <button onclick="runDeepAnalysis({{ complaint.id }})" class="btn btn-outline" style="margin-bottom: 16px;" id="deepAnalyzeBtn">
-                    <i class="fas fa-brain"></i> Get Detailed AI Analysis
-                </button>
-                <div id="aiAnalysis" class="ai-text" style="background: rgba(99, 102, 241, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.1); display: none;"></div>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px;">
+                    <button onclick="runDeepAnalysis({{ complaint.id }})" class="btn btn-outline" id="deepAnalyzeBtn">
+                        <i class="fas fa-brain"></i> Get Detailed AI Analysis
+                    </button>
+                    <!-- Domino Effect Forecaster (Public) -->
+                    <button onclick="forecastRippleEffect({{ complaint.id }})" class="btn btn-outline" style="border-color: rgba(239, 68, 68, 0.4); color: var(--danger);" id="rippleBtn">
+                        <i class="fas fa-wind"></i> AI Ripple Effect Forecast
+                    </button>
+                    <!-- Resource Matrix (Admin Only) -->
+                    {% if user_role == 'admin' %}
+                    <button onclick="generateResourceMatrix({{ complaint.id }})" class="btn btn-outline" style="border-color: rgba(16, 185, 129, 0.4); color: var(--success);" id="resourceMatrixBtn">
+                        <i class="fas fa-hard-hat"></i> Auto-Generate Resource Matrix
+                    </button>
+                    {% endif %}
+                </div>
+                
+                <div id="aiAnalysis" class="ai-text" style="background: rgba(99, 102, 241, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.1); display: none; margin-bottom: 15px;"></div>
+                
+                <div id="rippleContainer" class="ai-text" style="background: rgba(239, 68, 68, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px dashed rgba(239, 68, 68, 0.3); display: none; margin-bottom: 15px;">
+                    <h4 style="color: var(--danger); margin-bottom: 10px; font-size: 14px;"><i class="fas fa-exclamation-triangle"></i> Domino Effect Warning (If ignored for 7 days)</h4>
+                    <ul id="rippleList" style="padding-left: 20px; font-size: 13px; color: var(--text-secondary); line-height: 1.6;"></ul>
+                </div>
+                
+                {% if user_role == 'admin' %}
+                <div id="resourceContainer" class="ai-text" style="background: rgba(16, 185, 129, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px dashed rgba(16, 185, 129, 0.3); display: none; margin-bottom: 15px;">
+                    <h4 style="color: var(--success); margin-bottom: 10px; font-size: 14px;"><i class="fas fa-clipboard-list"></i> Operations Resource & Budget Blueprint</h4>
+                    <pre id="resourceMatrixText" style="white-space: pre-wrap; font-family: 'Inter', sans-serif; font-size: 13px; color: var(--text-secondary);"></pre>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Actions -->
             <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
                 <button onclick="upvoteComplaint({{ complaint.id }}, this)" class="btn btn-outline btn-sm">
                     <i class="fas fa-arrow-up"></i> Upvote <span class="upvote-count">{{ complaint.upvotes or 0 }}</span>
+                </button>
+                <button onclick="markAffected({{ complaint.id }}, this)" class="btn btn-outline btn-sm" style="border-color: rgba(239, 68, 68, 0.4); color: var(--danger);">
+                    <i class="fas fa-fist-raised"></i> I'm Affected Too <span class="affected-count">({{ complaint.affected_count or 0 }})</span>
+                </button>
+                <button onclick="subscribeNotify({{ complaint.id }}, this)" class="btn btn-outline btn-sm" style="border-color: rgba(16, 185, 129, 0.4); color: var(--success);">
+                    <i class="fas fa-bell"></i> Notify Me
                 </button>
                 {% if complaint.status != 'Resolved' %}
                 <button id="amplifyBtn" onclick="generateCampaign({{ complaint.id }})" class="btn btn-primary btn-sm" style="background-color: #ec4899; border-color: #ec4899;">
@@ -334,6 +390,59 @@
         </div>
     </div>
     {% endif %}
+
+    <!-- Interactive Community Comment Threads -->
+    <div class="detail-card reveal" style="margin-top: 24px;">
+        <div class="detail-body">
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">
+                <i class="fas fa-comments" style="color: var(--primary-light);"></i> Community Discussion ({{ comments|length }})
+            </h3>
+            
+            {% if logged_in %}
+            <form action="/api/complaint/{{ complaint.id }}/comment" method="POST" style="margin-bottom: 20px;">
+                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: white; flex-shrink: 0;">
+                        {{ session.get('username', 'U')[0]|upper }}
+                    </div>
+                    <div style="flex: 1;">
+                        <textarea name="content" required placeholder="Add to the discussion..." rows="2" style="width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.5); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical; margin-bottom: 8px;"></textarea>
+                        <button type="submit" class="btn btn-primary btn-sm" style="float: right;">Post Comment</button>
+                    </div>
+                </div>
+            </form>
+            {% else %}
+            <div style="padding: 15px; text-align: center; background: rgba(255,255,255,0.05); border-radius: var(--radius-sm); margin-bottom: 20px;">
+                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 10px;">Please login to join the discussion.</p>
+                <a href="/login" class="btn btn-outline btn-sm">Login</a>
+            </div>
+            {% endif %}
+
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                {% for comment in comments %}
+                <div style="display: flex; gap: 12px;">
+                    <div style="width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,0.1); border: 1px solid var(--border-light); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: var(--text-secondary); flex-shrink: 0;">
+                        {{ comment.fullname[0]|upper if comment.fullname else 'U' }}
+                    </div>
+                    <div style="flex: 1; background: rgba(15, 23, 42, 0.4); border-radius: var(--radius-md); padding: 12px 16px; border: 1px solid var(--border-light);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px; align-items: center;">
+                            <div>
+                                <strong style="color: var(--text-primary); font-size: 14px;">{{ comment.fullname }}</strong>
+                                <span style="font-size: 12px; color: var(--text-muted); margin-left: 6px;">@{{ comment.username }}</span>
+                                {% if comment.trust_score and comment.trust_score > 150 %}
+                                <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: var(--success); font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 6px;"><i class="fas fa-medal"></i> Local Hero</span>
+                                {% endif %}
+                            </div>
+                            <span style="font-size: 11px; color: var(--text-muted);">{{ comment.created_at[:16] }}</span>
+                        </div>
+                        <p style="color: var(--text-secondary); font-size: 14px; line-height: 1.5; margin: 0;">{{ comment.content }}</p>
+                    </div>
+                </div>
+                {% else %}
+                <p style="text-align: center; color: var(--text-muted); font-size: 13px; font-style: italic; margin-top: 10px;">No comments yet. Be the first to start the discussion!</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -412,6 +521,50 @@ function copyToClipboard(elementId, btn) {
         const originalText = btn.innerText;
         btn.innerText = "Copied!";
         setTimeout(() => { btn.innerText = originalText; }, 2000);
+    });
+}
+
+function markAffected(id, btn) {
+    btn.disabled = true;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    fetch(`/api/complaint/${id}/affected`, { method: 'POST', headers: {'Content-Type': 'application/json'} })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            btn.innerHTML = '<i class="fas fa-check"></i> Marked as Affected';
+            btn.style.background = 'rgba(239, 68, 68, 0.1)';
+        } else {
+            alert(data.message);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }).catch(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    });
+}
+
+function subscribeNotify(id, btn) {
+    btn.disabled = true;
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+    
+    fetch(`/api/complaint/${id}/subscribe`, { method: 'POST', headers: {'Content-Type': 'application/json'} })
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            btn.innerHTML = '<i class="fas fa-check"></i> Subscribed to Updates';
+            btn.style.background = 'rgba(16, 185, 129, 0.1)';
+        } else {
+            alert(data.message);
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+        }
+    }).catch(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
     });
 }
 
@@ -499,6 +652,69 @@ function runDeepAnalysis(id) {
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-brain"></i> Retry Analysis';
         });
+}
+
+function forecastRippleEffect(id) {
+    const btn = document.getElementById('rippleBtn');
+    const container = document.getElementById('rippleContainer');
+    const list = document.getElementById('rippleList');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Calculating Impact...';
+    container.style.display = 'block';
+    list.innerHTML = '<li style="list-style: none;"><div class="dot-pulse"><span style="background:var(--danger)"></span><span style="background:var(--danger)"></span><span style="background:var(--danger)"></span></div></li>';
+    
+    fetch(`/api/ripple-effect/${id}`)
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            list.innerHTML = '';
+            data.effects.forEach(e => {
+                let li = document.createElement('li');
+                li.style.marginBottom = '6px';
+                // Highlight words like Immediate, Secondary, Long-Term
+                li.innerHTML = e.replace(/(Immediate|Secondary|Long-Term|1\\.|2\\.|3\\.)/i, '<strong style="color: var(--text-primary);">$1</strong>');
+                list.appendChild(li);
+            });
+            btn.innerHTML = '<i class="fas fa-wind"></i> Forecast Complete';
+        } else {
+            list.innerHTML = `<li style="color: var(--danger); list-style: none;">${data.error}</li>`;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-wind"></i> AI Ripple Effect Forecast';
+        }
+    }).catch(() => {
+        list.innerHTML = '<li style="color: var(--danger); list-style: none;">Network error.</li>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-wind"></i> AI Ripple Effect Forecast';
+    });
+}
+
+function generateResourceMatrix(id) {
+    const btn = document.getElementById('resourceMatrixBtn');
+    const container = document.getElementById('resourceContainer');
+    const text = document.getElementById('resourceMatrixText');
+    
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Blueprint...';
+    container.style.display = 'block';
+    text.innerHTML = '<div class="dot-pulse"><span style="background:var(--success)"></span><span style="background:var(--success)"></span><span style="background:var(--success)"></span></div>';
+    
+    fetch(`/api/resource-matrix/${id}`)
+    .then(r => r.json())
+    .then(data => {
+        if(data.success) {
+            text.innerHTML = data.matrix.replace(/\\n/g, '<br>');
+            btn.innerHTML = '<i class="fas fa-hard-hat"></i> Blueprint Ready';
+        } else {
+            text.innerHTML = `<span style="color: var(--danger);">${data.error}</span>`;
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-hard-hat"></i> Auto-Generate Resource Matrix';
+        }
+    }).catch(() => {
+        text.innerHTML = '<span style="color: var(--danger);">Network error.</span>';
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-hard-hat"></i> Auto-Generate Resource Matrix';
+    });
 }
 </script>
 {% endblock %}

@@ -14,6 +14,15 @@ import random
 import string
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+from flask_wtf.csrf import CSRFProtect, generate_csrf
+from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
+import logging
+from logging.handlers import RotatingFileHandler
+
 from geopy.distance import geodesic
 from cv_utils import get_image_embedding, calculate_similarity
 
@@ -26,6 +35,41 @@ except ImportError:
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+
+# ---------------- RATE LIMITING ----------------
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["1000 per day", "200 per hour"],
+    storage_uri="memory://"
+)
+
+
+from city_twin import city_twin_bp
+from civic_iq import civic_iq_bp
+app.register_blueprint(city_twin_bp)
+app.register_blueprint(civic_iq_bp)
+
+# ---------------- GLOBAL ERROR HANDLING ----------------
+handler = RotatingFileHandler('app_errors.log', maxBytes=100000, backupCount=3)
+handler.setLevel(logging.ERROR)
+app.logger.addHandler(handler)
+
+@app.errorhandler(404)
+def not_found_error(error):
+    app.logger.error(f'Page not found: {request.url}')
+    return "Not Found", 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    app.logger.error(f'Server Error: {error}')
+    return "Internal Server Error", 500
+
+@app.errorhandler(Exception)
+def unhandled_exception(e):
+    app.logger.error(f'Unhandled Exception: {e}')
+    return "Internal Server Error", 500
+
 
 # Persistent Storage Logic (for Fly.io / Volumes)
 DATA_DIR = "/data" if os.path.exists("/data") else os.path.dirname(os.path.abspath(__file__))
@@ -126,6 +170,77 @@ def ask_groq(prompt, system_message="You are a helpful assistant for a local gov
         print(f"GROQ ERROR: {str(e)}")
         return None
 
+def transcribe_audio(file_path):
+    """Transcribe audio file using Groq's Whisper model."""
+    if not GROQ_API_KEY:
+        return None
+    try:
+        url = "https://api.groq.com/openai/v1/audio/transcriptions"
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}"
+        }
+        with open(file_path, "rb") as f:
+            files = {
+                "file": (os.path.basename(file_path), f),
+                "model": (None, "whisper-large-v3"),
+                "response_format": (None, "json")
+            }
+            response = requests.post(url, headers=headers, files=files, timeout=30)
+        
+        if response.status_code != 200:
+            print(f"TRANSCRIPTION ERROR: {response.status_code} - {response.text}")
+            return None
+        return response.json().get("text")
+    except Exception as e:
+        print(f"TRANSCRIPTION EXCEPTION: {str(e)}")
+        return None
+
+@app.route("/api/voice-report", methods=["POST"])
+@limiter.limit("10 per minute")
+def voice_report():
+    """Handle voice complaint filing: transcribe and structure."""
+    if 'audio' not in request.files:
+        return jsonify({"error": "No audio file provided"}), 400
+    
+    audio_file = request.files['audio']
+    temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_{random.randint(1000,9999)}.webm")
+    audio_file.save(temp_path)
+    
+    # 1. Transcribe
+    transcript = transcribe_audio(temp_path)
+    if os.path.exists(temp_path):
+        os.remove(temp_path) # Cleanup
+        
+    if not transcript:
+        return jsonify({"error": "Transcription failed. Please try again or type."})
+        
+    # 2. Structure using LLM
+    prompt = f"""Transcript from citizen voice note: "{transcript}"
+Analyze this and return ONLY a JSON object:
+{{
+  "category": "Pothole, Garbage, Water Leakage, Streetlight, Sewage, Road Damage, Traffic Signal, Noise Pollution, Illegal Dumping, or Other",
+  "clean_description": "A formal, structured description based on the transcript",
+  "priority": "High, Medium, or Low",
+  "native_transcript": "{transcript}"
+}}"""
+    
+    structured_raw = ask_groq(prompt, "You are a civic data structuring AI. Return only JSON.")
+    if not structured_raw:
+        return jsonify({"error": "AI structuring failed."})
+        
+    try:
+        clean_json = structured_raw.strip()
+        if "```json" in clean_json: clean_json = clean_json.split("```json")[1].split("```")[0]
+        data = json.loads(clean_json)
+        return jsonify(data)
+    except:
+        return jsonify({
+            "category": "Other",
+            "clean_description": transcript,
+            "priority": "Medium",
+            "native_transcript": transcript
+        })
+
 def ask_groq_vision(base64_image, prompt="Analyze this image."):
     """Send a multimodal prompt to Groq AI Vision model and return the response."""
     if not GROQ_API_KEY:
@@ -163,18 +278,116 @@ def ask_groq_vision(base64_image, prompt="Analyze this image."):
         return None
 
 
+# ---------------- CSRF PROTECTION ----------------
+app.config['WTF_CSRF_SECRET_KEY'] = app.secret_key
+app.config['WTF_CSRF_CHECK_DEFAULT'] = False
+csrf = CSRFProtect(app)
+
+@app.before_request
+def manual_csrf_check():
+    if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
+        if request.path.startswith('/api/') or request.path.startswith('/live-pulse'):
+            return
+        from flask_wtf.csrf import validate_csrf
+        try:
+            validate_csrf(request.form.get('csrf_token'))
+        except Exception:
+            return "CSRF verification failed", 400
+
+@app.after_request
+def inject_csrf_token(response):
+    if response.content_type and 'text/html' in response.content_type:
+        html = response.get_data(as_text=True)
+        if '<form' in html.lower():
+            csrf_input = f'<input type="hidden" name="csrf_token" value="{generate_csrf()}"/>'
+            import re
+            html = re.sub(r'(<form[^>]*>)', rf'\1\n{csrf_input}', html, flags=re.IGNORECASE)
+            response.set_data(html)
+    return response
+
+
 # ---------------- DATABASE CONNECTION ----------------
 DB_PATH = os.path.join(DATA_DIR, "database.db")
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:///{DB_PATH}')
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
+
+class DBConnectionWrapper:
+    def __init__(self):
+        self.session = db.session()
+        
+    def execute(self, sql, params=()):
+        param_idx = 0
+        def replace_qm(match):
+            nonlocal param_idx
+            replacement = f":p{param_idx}"
+            param_idx += 1
+            return replacement
+            
+        converted_sql = re.sub(r'\?', replace_qm, sql)
+        
+        if isinstance(params, (tuple, list)):
+            dict_params = {f"p{i}": val for i, val in enumerate(params)}
+        elif isinstance(params, dict):
+            dict_params = params
+        else:
+            dict_params = {}
+            
+        result = self.session.execute(text(converted_sql), dict_params)
+        
+        class CustomRow:
+            def __init__(self, row):
+                self._row = row
+                self._mapping = row._mapping
+            def __getitem__(self, key):
+                if isinstance(key, int):
+                    return self._row[key]
+                return self._mapping[key]
+            def keys(self):
+                return self._mapping.keys()
+            def __iter__(self):
+                return iter(self._mapping.keys())
+
+        class DBResult:
+            def __init__(self, result):
+                self.result = result
+            def fetchone(self):
+                try:
+                    r = self.result.fetchone()
+                    return CustomRow(r) if r else None
+                except Exception:
+                    return None
+            def fetchall(self):
+                try:
+                    return [CustomRow(r) for r in self.result.fetchall()]
+                except Exception:
+                    return []
+                    
+        return DBResult(result)
+
+    def commit(self):
+        self.session.commit()
+
+    def close(self):
+        self.session.close()
 
 def get_db_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    return DBConnectionWrapper()
 
 
 # ---------------- CREATE TABLES ----------------
 def create_table():
     conn = get_db_connection()
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS workers (
+            name TEXT PRIMARY KEY,
+            lat REAL,
+            lng REAL,
+            assignment TEXT,
+            last_seen TEXT
+        )
+    """)
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS complaints (
@@ -254,6 +467,55 @@ def create_table():
         )
     """)
 
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            complaint_id INTEGER,
+            user_id INTEGER,
+            parent_id INTEGER DEFAULT NULL,
+            content TEXT,
+            created_at TEXT
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS issue_affected (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            complaint_id INTEGER,
+            user_id INTEGER,
+            created_at TEXT,
+            UNIQUE(complaint_id, user_id)
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS issue_timeline (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            complaint_id INTEGER,
+            status TEXT,
+            notes TEXT,
+            created_at TEXT
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS weekly_summaries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            summary TEXT,
+            created_at TEXT
+        )
+    """)
+
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS user_badges (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            badge_name TEXT,
+            awarded_at TEXT,
+            UNIQUE(user_id, badge_name)
+        )
+    """)
+
     # Migration: add columns if missing
     migrations = [
         ("complaints", "location", "TEXT DEFAULT ''"),
@@ -273,6 +535,9 @@ def create_table():
         ("complaints", "department", "TEXT DEFAULT 'General'"),
         ("complaints", "estimated_resolution_time", "TEXT DEFAULT ''"),
         ("complaints", "resolution_confidence", "INTEGER DEFAULT 0"),
+        ("complaints", "ward", "TEXT DEFAULT 'Ward 1'"),
+        ("complaints", "is_anonymous", "INTEGER DEFAULT 0"),
+        ("complaints", "affected_count", "INTEGER DEFAULT 0"),
         ("users", "role", "TEXT DEFAULT 'user'"),
         ("users", "created_at", "TEXT"),
         ("users", "trust_score", "INTEGER DEFAULT 100"),
@@ -287,8 +552,8 @@ def create_table():
 
     conn.commit()
     conn.close()
-
-create_table()
+with app.app_context():
+    create_table()
 
 # Inject global variables
 @app.context_processor
@@ -298,7 +563,7 @@ def inject_user_data():
         user = conn.execute("SELECT fullname, trust_score, streak_days FROM users WHERE id=?", (session['user_id'],)).fetchone()
         conn.close()
         if user:
-            return {'g_fullname': user['fullname'], 'g_trust_score': user['trust_score'], 'g_streak_days': user.get('streak_days', 0)}
+            return {'g_fullname': user['fullname'], 'g_trust_score': user['trust_score'], 'g_streak_days': user['streak_days'] or 0}
     return {}
 
 
@@ -315,9 +580,22 @@ def login_required(f):
 def admin_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'user_id' not in session or session.get('role') != 'admin':
+        if 'user_id' not in session:
             flash('Admin access required.', 'danger')
             return redirect('/login')
+            
+        # Allow hardcoded admin bypass
+        if session.get('user_id') == 0 and session.get('role') == 'admin':
+            return f(*args, **kwargs)
+            
+        conn = get_db_connection()
+        user = conn.execute("SELECT role FROM users WHERE id=?", (session['user_id'],)).fetchone()
+        conn.close()
+        
+        if not user or user['role'] != 'admin':
+            flash('Admin access required.', 'danger')
+            return redirect('/login')
+            
         return f(*args, **kwargs)
     return decorated_function
 
@@ -342,8 +620,9 @@ def get_priority(category):
 # ---------------- CONTEXT PROCESSOR ----------------
 @app.context_processor
 def inject_user():
+    is_logged = 'user_id' in session
     return {
-        'logged_in': 'user_id' in session,
+        'logged_in': is_logged,
         'username': session.get('username', ''),
         'user_role': session.get('role', 'user'),
         'current_year': datetime.now().year
@@ -373,6 +652,16 @@ def home():
     return render_template("index.html", total=total, resolved=resolved, pending=pending, recent=recent, announcements=announcements)
 
 # ---------------- LIVE CITY PULSE ----------------
+@app.route('/api/civic-news')
+def get_civic_news():
+    """Returns curated municipal and urban development news."""
+    return jsonify([
+        {"title": "Smart Cities Mission Reaches 2025 Milestone", "summary": "Over 95% of 8,000 sanctioned projects finalized. Integrated Command Centers now operational in 100 cities.", "source": "PIB India", "tag": "Policy"},
+        {"title": "AMRUT 2.0: Circular Economy for Water Scaling", "summary": "New 'City Water Balance Plans' introduced to recycle treated sewage across tier-2 cities.", "source": "MoHUA", "tag": "Environment"},
+        {"title": "Global Logistics Hub Breakthrough", "summary": "PM Gati Shakti National Master Plan integrates 10+ data layers for urban transport optimization.", "source": "Invest India", "tag": "Infrastructure"},
+        {"title": "Industrial Smart Cities Approved", "summary": "Government greenlights 12 major hubs to boost manufacturing and regional jobs.", "source": "The Hindu", "tag": "Economy"}
+    ])
+
 @app.route("/live-pulse")
 def live_pulse():
     conn = get_db_connection()
@@ -381,16 +670,16 @@ def live_pulse():
     total_resolved = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Resolved'").fetchone()[0]
     total_pending = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Pending'").fetchone()[0]
     
-    # Radar issues (top 5 to pass to radar)
-    radar_issues = conn.execute("SELECT id, category, priority, latitude, longitude FROM complaints WHERE status!='Resolved' AND latitude IS NOT NULL LIMIT 5").fetchall()
+    # Granular Dept Stats
+    dept_stats = conn.execute("SELECT category, COUNT(*) as count FROM complaints GROUP BY category LIMIT 4").fetchall()
+    
+    # Radar issues
+    radar_issues = conn.execute("SELECT id, category, priority, latitude, longitude FROM complaints WHERE status!='Resolved' AND latitude IS NOT NULL LIMIT 8").fetchall()
     radar_data = [dict(r) for r in radar_issues]
     conn.close()
     
-    # Generate live AI insight
-    prompt = f"Write a dramatic, live 1-sentence headline summarizing city issues today: {total_today} new reports. {total_resolved} resolved overall, {total_pending} still pending active."
-    live_summary = ask_groq(prompt, "You are a live civic news AI. Output one punchy sentence.") or f"Live Pulse active: {total_today} complaints reported today."
-
-    return render_template("live_pulse.html", total_today=total_today, resolved=total_resolved, pending=total_pending, live_summary=live_summary, radar_data=radar_data)
+    live_summary = ask_groq(f"Summary for today: {total_today} new reports. {total_resolved} resolved. Output 1 punchy civic headline.", "Live Pulse News Anchor.")
+    return render_template("live_pulse.html", total_today=total_today, resolved=total_resolved, pending=total_pending, live_summary=live_summary, radar_data=radar_data, dept_stats=dept_stats)
 
 # ---------------- REPORT ----------------
 
@@ -401,6 +690,7 @@ def report_page():
 
 
 @app.route("/report", methods=["POST"])
+@limiter.limit("5 per minute")
 @login_required
 def submit_report():
     category = request.form["category"]
@@ -413,6 +703,7 @@ def submit_report():
     longitude = float(lon_str) if lon_str else None
 
     is_emergency = 1 if request.form.get("is_emergency") else 0
+    is_anonymous = 1 if request.form.get("is_anonymous") else 0
     priority = "Urgent" if is_emergency else get_priority(category)
     status = "Pending"
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -525,10 +816,18 @@ Keep it under 150 words."""
         return redirect(f"/complaint/{matched_complaint_id}")
     # -------------------------
 
+    ward = "Ward " + str(random.randint(1, 5)) # Dynamic Mock Ward assignment
     conn.execute(
-        """INSERT INTO complaints (category, description, priority, status, location, created_at, ai_analysis, ai_suggestion, image_url, video_url, is_emergency, user_id, latitude, longitude, image_embedding) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-        (category, description, priority, status, location, created_at, ai_analysis, ai_suggestion, image_url, video_url, is_emergency, session.get('user_id', 0), latitude, longitude, new_embedding_bytes)
+        """INSERT INTO complaints (category, description, priority, status, location, created_at, ai_analysis, ai_suggestion, image_url, video_url, is_emergency, user_id, latitude, longitude, image_embedding, ward, is_anonymous) 
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (category, description, priority, status, location, created_at, ai_analysis, ai_suggestion, image_url, video_url, is_emergency, session.get('user_id', 0), latitude, longitude, new_embedding_bytes, ward, is_anonymous)
+    )
+    complaint_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    
+    # Initialize timeline
+    conn.execute(
+        "INSERT INTO issue_timeline (complaint_id, status, notes, created_at) VALUES (?, ?, ?, ?)",
+        (complaint_id, "Reported", "Issue was successfully reported by citizen.", created_at)
     )
     
     # Update Fix Streak
@@ -758,7 +1057,7 @@ def nearby_duplicates():
     data = request.get_json()
     lat = data.get("latitude")
     lng = data.get("longitude")
-    if not lat or not lng:
+    if lat is None or lng is None:
         return jsonify([])
         
     conn = get_db_connection()
@@ -863,7 +1162,7 @@ def delete_complaint(id):
 @app.route("/complaint/<int:id>")
 def view_complaint(id):
     conn = get_db_connection()
-    complaint = conn.execute("SELECT * FROM complaints WHERE id=?", (id,)).fetchone()
+    complaint = conn.execute("SELECT c.*, u.fullname, u.username, u.trust_score FROM complaints c LEFT JOIN users u ON c.user_id = u.id WHERE c.id=?", (id,)).fetchone()
 
     # Get feedback for this complaint
     try:
@@ -871,11 +1170,102 @@ def view_complaint(id):
     except:
         feedbacks = []
 
+    # Get comments
+    try:
+        comments = conn.execute("""
+            SELECT c.*, u.fullname, u.username, u.trust_score 
+            FROM comments c 
+            JOIN users u ON c.user_id = u.id 
+            WHERE c.complaint_id=? ORDER BY c.created_at ASC
+        """, (id,)).fetchall()
+    except:
+        comments = []
+
+    # Get timeline
+    try:
+        timeline = conn.execute("SELECT * FROM issue_timeline WHERE complaint_id=? ORDER BY created_at ASC", (id,)).fetchall()
+    except:
+        timeline = []
+
     conn.close()
     if not complaint:
         flash('Complaint not found.', 'danger')
         return redirect("/complaints")
-    return render_template("complaint_detail.html", complaint=complaint, feedbacks=feedbacks)
+    return render_template("complaint_detail.html", complaint=complaint, feedbacks=feedbacks, comments=comments, timeline=timeline)
+
+# ======== NEW COMMUNITY BOARD ROUTES ========
+@app.route("/api/complaint/<int:id>/comment", methods=["POST"])
+@login_required
+def add_comment(id):
+    content = request.form.get("content", "").strip()
+    if not content:
+        flash("Comment cannot be empty.", "warning")
+        return redirect(f"/complaint/{id}")
+    
+    # Store comment
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    conn.execute("INSERT INTO comments (complaint_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
+                 (id, session['user_id'], content, created_at))
+    conn.commit()
+    conn.close()
+    flash("Comment added successfully!", "success")
+    return redirect(f"/complaint/{id}")
+
+@app.route("/api/complaint/<int:id>/affected", methods=["POST"])
+@login_required
+def affected_too(id):
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    try:
+        conn.execute("INSERT INTO issue_affected (complaint_id, user_id, created_at) VALUES (?, ?, ?)",
+                     (id, session['user_id'], created_at))
+        conn.execute("UPDATE complaints SET affected_count = affected_count + 1 WHERE id=?", (id,))
+        conn.commit()
+        success = True
+        msg = "You've marked this issue as affecting you."
+    except sqlite3.IntegrityError:
+        success = False
+        msg = "You already marked this issue."
+    conn.close()
+    
+    return jsonify({"success": success, "message": msg})
+
+@app.route("/admin/timeline/<int:id>", methods=["POST"])
+@admin_required
+def update_timeline(id):
+    status = request.form.get("status", "In Progress")
+    notes = request.form.get("notes", "Status updated by admin.").strip()
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    conn = get_db_connection()
+    # Insert new timeline stage
+    conn.execute("INSERT INTO issue_timeline (complaint_id, status, notes, created_at) VALUES (?, ?, ?, ?)",
+                 (id, status, notes, created_at))
+    # Update main issue status
+    conn.execute("UPDATE complaints SET status=? WHERE id=?", (status, id))
+    conn.commit()
+    conn.close()
+    
+    flash("Timeline updated!", "success")
+    return redirect(f"/complaint/{id}")
+
+@app.route("/api/complaint/<int:id>/subscribe", methods=["POST"])
+@login_required
+def subscribe_notify(id):
+    created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    conn = get_db_connection()
+    try:
+        conn.execute("INSERT INTO complaint_subscribers (complaint_id, user_id, created_at) VALUES (?, ?, ?)",
+                     (id, session['user_id'], created_at))
+        conn.commit()
+        success = True
+        msg = "You are now subscribed. We'll notify you on status changes."
+    except sqlite3.IntegrityError:
+        success = False
+        msg = "You are already subscribed to this issue."
+    conn.close()
+    return jsonify({"success": success, "message": msg})
 
 
 # ======== REAL AUTH: OTP API ========
@@ -1162,6 +1552,96 @@ Keep it under 200 words. Use bullet points."""
     summary = ask_groq(prompt, "You are a municipal data analyst. Provide actionable insights.")
     return jsonify({"summary": summary})
 
+@app.route('/admin/dept-insight/<category>')
+def dept_insight(category):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    conn = get_db_connection()
+    complaints = conn.execute("SELECT description, priority, status FROM complaints WHERE category=? AND status='Pending' LIMIT 10", (category,)).fetchall()
+    conn.close()
+    
+    if not complaints:
+        return jsonify({"insight": "No pending complaints found for this department."})
+    
+    # Pre-process descriptions for prompt
+    data_summary = "\n".join([f"- Priority: {c['priority']}, Desc: {c['description']}" for c in complaints])
+    
+    prompt = f"""
+    You are a Senior Municipal Planning Expert. Analyzing the latest PENDING complaints for the '{category}' department:
+    {data_summary}
+    
+    Provide a professional, actionable 3-point summary for the government staff:
+    1. Major Trending Issue: What is the biggest concern?
+    2. Recommended Staff Action: What step should be taken first?
+    3. Community Impact: How does this affect citizens?
+    
+    Keep it professional, concise, and structured.
+    """
+    
+    insight = ask_groq(prompt, system_message="Official Government Strategic Advisor. Focus on efficiency and citizen satisfaction.")
+    return jsonify({"insight": insight})
+
+@app.route('/admin/generate-weekly-report')
+def generate_weekly_report():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({"error": "Unauthorized"}), 403
+    
+    conn = get_db_connection()
+    # Get stats per ward
+    ward_stats = conn.execute("""
+        SELECT ward, COUNT(*) as total, 
+        SUM(CASE WHEN status='Resolved' THEN 1 ELSE 0 END) as resolved,
+        SUM(CASE WHEN status='Pending' THEN 1 ELSE 0 END) as pending
+        FROM complaints GROUP BY ward
+    """).fetchall()
+    
+    top_categories = conn.execute("""
+        SELECT category, COUNT(*) as count FROM complaints GROUP BY category ORDER BY count DESC LIMIT 3
+    """).fetchall()
+    conn.close()
+    
+    stats_summary = "\n".join([f"Ward: {w['ward']}, Total: {w['total']}, Fixed: {w['resolved']}, Pending: {w['pending']}" for w in ward_stats])
+    cats_summary = ", ".join([f"{c['category']} ({c['count']})" for c in top_categories])
+    
+    prompt = f"""
+    You are a Municipal Commissioner's Executive Assistant. Generate a FORMAL weekly performance report based on this data:
+    
+    WEEKLY DATA:
+    {stats_summary}
+    
+    TOP ISSUES:
+    {cats_summary}
+    
+    Provide the report in these sections:
+    1. Executive Overview (Professional summary)
+    2. Ward Performance Table (Mock up a textual table)
+    3. Primary Bottlenecks (Analyze why issues are pending)
+    4. Strategic Recommendations for Next Week
+    
+    Keep the tone extremely professional and suitable for a City Council meeting.
+    """
+    
+    report = ask_groq(prompt, system_message="Formal Municipal Reporting AI. Use institutional and administrative tone.")
+    return jsonify({"report": report})
+
+@app.route('/admin/dashboard')
+def admin_dashboard():
+    conn = get_db_connection()
+    complaints = conn.execute("SELECT id, category, latitude, longitude, priority, status FROM complaints WHERE latitude IS NOT NULL").fetchall()
+    conn.close()
+    data = []
+    for c in complaints:
+        data.append({
+            "id": c["id"],
+            "category": c["category"],
+            "lat": c["latitude"],
+            "lng": c["longitude"],
+            "priority": c["priority"],
+            "status": c["status"]
+        })
+    return jsonify(data)
+
 @app.route("/api/map-data")
 def map_data():
     conn = get_db_connection()
@@ -1181,6 +1661,40 @@ def map_data():
 
 
 # ======== ANNOUNCEMENTS (Admin) ========
+@app.route("/api/enhance-announcement", methods=["POST"])
+@limiter.limit("10 per minute")
+@admin_required
+def api_enhance_announcement():
+    data = request.get_json()
+    title = data.get("title", "").strip()
+    content = data.get("content", "").strip()
+    
+    if not title and not content:
+        return jsonify({"error": "Please provide title or content to enhance."})
+        
+    prompt = f"""Enhance this municipal announcement to be more professional, clear, and engaging for citizens:
+Title: {title}
+Content: {content}
+
+Return pure JSON object:
+{{
+  "title": "Enhanced professional title",
+  "content": "Enhanced professional and clear content"
+}}"""
+
+    raw = ask_groq(prompt, "You are a municipal communications expert. Return only JSON.")
+    if not raw:
+        return jsonify({"error": "AI service unavailable."})
+    try:
+        import json
+        clean_json = raw.strip()
+        if clean_json.startswith("```json"): clean_json = clean_json.replace("```json", "", 1)
+        if clean_json.endswith("```"): clean_json = clean_json[::-1].replace("```"[::-1], "", 1)[::-1]
+        result = json.loads(clean_json.strip())
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"error": "AI enhancement failed."})
+
 @app.route("/announcement", methods=["POST"])
 @admin_required
 def create_announcement():
@@ -1222,13 +1736,78 @@ def community():
     except:
         announcements = []
 
+    # Get Weekly Summary
+    try:
+        latest_summary = conn.execute("SELECT * FROM weekly_summaries ORDER BY id DESC LIMIT 1").fetchone()
+    except:
+        latest_summary = None
+
     # Top upvoted complaints
     top_complaints = conn.execute(
-        "SELECT * FROM complaints ORDER BY upvotes DESC LIMIT 10"
+        "SELECT c.*, (SELECT COUNT(*) FROM comments WHERE complaint_id = c.id) as comment_count FROM complaints c ORDER BY c.upvotes DESC LIMIT 10"
     ).fetchall()
 
+    # Resolved Issue Celebration Feed
+    resolved_feed = conn.execute("""
+        SELECT c.*, u.fullname,
+               (julianday(c.resolved_at) - julianday(c.created_at)) as resolution_days
+        FROM complaints c
+        LEFT JOIN users u ON c.user_id = u.id
+        WHERE c.status='Resolved'
+        ORDER BY c.resolved_at DESC LIMIT 5
+    """).fetchall()
+
+    # Department Response Leaderboard
+    dept_leaderboard = conn.execute("""
+        SELECT department, COUNT(*) as resolved_count, 
+               AVG(julianday(resolved_at) - julianday(created_at)) as avg_days
+        FROM complaints 
+        WHERE status='Resolved' AND department != 'General'
+        GROUP BY department
+        ORDER BY avg_days ASC
+        LIMIT 5
+    """).fetchall()
+
     conn.close()
-    return render_template("community.html", announcements=announcements, top_complaints=top_complaints)
+    return render_template("community.html", 
+                           announcements=announcements, 
+                           top_complaints=top_complaints,
+                           latest_summary=latest_summary,
+                           resolved_feed=resolved_feed,
+                           dept_leaderboard=dept_leaderboard)
+
+@app.route("/admin/generate-weekly-summary", methods=["POST"])
+@admin_required
+def generate_weekly_summary():
+    conn = get_db_connection()
+    # fetch top complaints from last 7 days
+    recent = conn.execute("SELECT category, description, upvotes FROM complaints ORDER BY upvotes DESC LIMIT 5").fetchall()
+    conn.close()
+    
+    if not recent:
+        flash("No recent complaints to summarize.", "info")
+        return redirect("/dashboard")
+
+    issues_text = "\\n".join([f"- {c['category']} ({c['upvotes']} upvotes): {c['description']}" for c in recent])
+    
+    prompt = f"""You are CivicAI summarizing the community's week.
+Here are the top trending citizen issues:
+{issues_text}
+
+Draft ONE concise, professional, and encouraging paragraph summarizing the key concerns for this week. No markdown formatting, just pure text."""
+
+    summary = ask_groq(prompt, "You are a public relations AI for a city.")
+    if summary:
+        conn = get_db_connection()
+        conn.execute("INSERT INTO weekly_summaries (summary, created_at) VALUES (?, ?)", 
+                     (summary, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+        flash("Weekly summary generated!", "success")
+    else:
+        flash("Failed to generate summary via AI.", "danger")
+    
+    return redirect("/dashboard")
 
 
 # ---------------- AI CHAT ----------------
@@ -1239,6 +1818,7 @@ def ai_chat_page():
 
 
 @app.route("/api/chat", methods=["POST"])
+@limiter.limit("20 per minute")
 def ai_chat():
     data = request.get_json()
     user_message = data.get("message", "")
@@ -1466,6 +2046,56 @@ def admin_delete_user(id):
     flash("User deleted.", "info")
     return redirect("/admin/users")
 
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
+
+# --- NEW AMAZING AI FEATURES ---
+@app.route('/api/ripple-effect/<int:id>')
+def api_ripple_effect(id):
+    complaint = query_db('SELECT * FROM complaints WHERE id = ?', [id], one=True)
+    if not complaint:
+        return jsonify({'error': 'Complaint not found'})
+    
+    prompt = f"""
+    Analyze this civic issue: {complaint['category']} - {complaint['description']}.
+    What are the cascading 'ripple effects' if this is ignored for a week? 
+    Give exactly 3 short points. Start Point 1 with 'Immediate:', Point 2 with 'Secondary:', Point 3 with 'Long-Term:'. Keep it brief and severely impactful.
+    """
+    
+    try:
+        response = call_groq_llama(prompt)
+        lines = [line.strip() for line in response.split('\n') if line.strip() and (line.startswith('Immediate') or line.startswith('Secondary') or line.startswith('Long-Term') or line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or line.startswith('-'))]
+        if not lines:
+            lines = [response]
+        return jsonify({'success': True, 'effects': lines})
+    except Exception as e:
+        return jsonify({'error': str(e)})
+
+@app.route('/api/resource-matrix/<int:id>')
+def api_resource_matrix(id):
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    complaint = query_db('SELECT * FROM complaints WHERE id = ?', [id], one=True)
+    if not complaint:
+        return jsonify({'error': 'Complaint not found'})
+        
+    prompt = f"""
+    Act as a Municipal Operations AI.
+    Analyze this repair job: {complaint['category']} - {complaint['description']}.
+    Provide a highly realistic 'Resource & Budget Matrix' in exactly these 3 lines:
+    1. Crew Required: [workers]
+    2. Equipment: [tools]
+    3. Estimated Cost: [$X, short reason]
+    """
+    
+    try:
+        response = call_groq_llama(prompt)
+        return jsonify({'success': True, 'matrix': response})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 # ---------------- RUN APP ----------------
 if __name__ == "__main__":

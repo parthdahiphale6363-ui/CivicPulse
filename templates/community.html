@@ -9,6 +9,21 @@
         <p class="section-description">Stay updated with announcements and see trending issues</p>
     </div>
 
+    <!-- Auto Weekly Community Summary -->
+    {% if latest_summary %}
+    <div style="margin-bottom: 48px; background: rgba(16, 185, 129, 0.05); border: 1px dashed rgba(16, 185, 129, 0.3); padding: 24px; border-radius: var(--radius-lg);" class="reveal">
+        <h3 style="font-size: 20px; font-weight: 700; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; color: var(--success);">
+            <i class="fas fa-robot"></i> AI Weekly Community Summary
+        </h3>
+        <p style="font-size: 15px; line-height: 1.6; color: var(--text-primary);">
+            {{ latest_summary.summary }}
+        </p>
+        <div style="font-size: 11px; margin-top: 15px; color: var(--text-muted);">
+            Generated on {{ latest_summary.created_at[:10] }} by CivicAI
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Announcements -->
     {% if announcements %}
     <div style="margin-bottom: 48px;">
@@ -44,7 +59,7 @@
         {% if top_complaints %}
         <div class="complaint-list">
             {% for c in top_complaints %}
-            <a href="/complaint/{{ c.id }}" class="complaint-item reveal" style="text-decoration: none; color: inherit;">
+            <a href="/complaint/{{ c.id }}" class="complaint-item reveal" style="text-decoration: none; color: inherit; position: relative;">
                 <div style="display: flex; align-items: center; gap: 6px; min-width: 50px;">
                     <i class="fas fa-arrow-up" style="color: var(--primary-light);"></i>
                     <strong style="font-size: 16px; color: var(--primary-light);">{{ c.upvotes or 0 }}</strong>
@@ -54,10 +69,16 @@
                 </span>
                 <div class="complaint-info">
                     <h4>{{ c.description[:80] }}{% if c.description|length > 80 %}...{% endif %}</h4>
-                    <p>{{ c.created_at[:10] if c.created_at else 'Recently' }} {% if c.location %}· {{ c.location }}{% endif %}</p>
+                    <p>
+                        {{ c.created_at[:10] if c.created_at else 'Recently' }} 
+                        {% if c.location %}· {{ c.location }}{% endif %}
+                    </p>
                 </div>
-                <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
-                <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+                <div style="display: flex; gap: 12px; align-items: center;">
+                    <span style="font-size: 12px; color: var(--text-muted);" title="Comments"><i class="fas fa-comment-dots"></i> {{ c.comment_count or 0 }}</span>
+                    <span class="priority-badge priority-{{ c.priority|lower }}">{{ c.priority }}</span>
+                    <span class="status-badge status-{{ c.status|lower }}">{{ c.status }}</span>
+                </div>
             </a>
             {% endfor %}
         </div>
@@ -68,6 +89,61 @@
             <p>Upvote complaints to help prioritize the most important issues!</p>
         </div>
         {% endif %}
+    <!-- Transparency Phase: Resolved Feed & Leaderboard -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 50px;">
+        <!-- Resolved Celebration Feed -->
+        <div>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: var(--success);" class="reveal">
+                <i class="fas fa-check-circle"></i> Resolved & Celebrated
+            </h3>
+            {% if resolved_feed %}
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                {% for r in resolved_feed %}
+                <div class="glass reveal" style="padding: 16px; border-left: 4px solid var(--success); border-radius: var(--radius-sm);">
+                    <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 6px;">{{ r.category }}</div>
+                    <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px;">{{ r.description[:60] }}...</div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 12px;">
+                        <span style="color: var(--success); font-weight: bold;"><i class="fas fa-rocket"></i> Fixed in {{ "%.1f"|format(r.resolution_days or 0) }} days</span>
+                        <a href="/complaint/{{ r.id }}" style="color: var(--primary-light); text-decoration: none;">View</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted); font-size: 13px;">No recently resolved issues yet.</p>
+            {% endif %}
+        </div>
+
+        <!-- Dept Leaderboard -->
+        <div>
+            <h3 style="font-size: 18px; font-weight: 700; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; color: var(--accent);" class="reveal">
+                <i class="fas fa-trophy"></i> Dept Response Leaderboard
+            </h3>
+            {% if dept_leaderboard %}
+            <div style="display: flex; flex-direction: column; gap: 15px;">
+                {% for d in dept_leaderboard %}
+                <div class="glass reveal" style="padding: 16px; border-radius: var(--radius-sm); border: 1px solid rgba(168, 85, 247, 0.2);">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 14px; font-weight: 600;">
+                            {% if loop.index == 1 %}🥇{% elif loop.index == 2 %}🥈{% elif loop.index == 3 %}🥉{% else %}{{ loop.index }}.{% endif %}
+                            {{ d.department }}
+                        </span>
+                        <span style="font-size: 14px; font-weight: 700; color: var(--accent);">{{ "%.1f"|format(d.avg_days or 0) }} avg days</span>
+                    </div>
+                    <div style="background: rgba(255,255,255,0.05); height: 6px; border-radius: 3px; overflow: hidden; position: relative;">
+                        <!-- Mock chart bar, lower days = fuller bar (inverse logic visually) -->
+                        {% set width = 100 - ((d.avg_days or 0) * 5) %}
+                        <div style="position: absolute; top: 0; left: 0; height: 100%; width: {{ width if width > 5 else 5 }}%; background: var(--gradient-accent);"></div>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px; text-align: right;">{{ d.resolved_count }} issues resolved</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <p style="color: var(--text-muted); font-size: 13px;">Not enough data to calculate department speeds yet.</p>
+            {% endif %}
+        </div>
     </div>
+
 </div>
 {% endblock %}

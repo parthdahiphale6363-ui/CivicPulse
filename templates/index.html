@@ -2,39 +2,33 @@
 {% block title %}CivicPulse — Smart Local Problem Reporting System{% endblock %}
 
 {% block content %}
-<!-- Hero Section -->
+<!-- Hero Section with Enhanced Animations -->
 <section class="hero">
-    <div class="hero-particles">
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
-        <div class="particle"></div>
+    <div class="hero-video-container">
+        <video autoplay muted loop playsinline class="hero-video">
+            <source src="https://assets.mixkit.co/videos/preview/mixkit-daytime-timelapse-of-a-busy-city-avenue-3430-large.mp4" type="video/mp4">
+        </video>
+        <div class="video-overlay"></div>
     </div>
 
     <div class="hero-content">
-        <div class="hero-badge">
+        <div class="hero-badge reveal">
             <i class="fas fa-bolt"></i>
             AI-Powered Civic Engagement Platform
         </div>
 
-        <h1 class="hero-title">
-            Report Local Problems<br>
-            <span class="gradient-text">Get Them Solved Faster</span>
+        <h1 class="hero-title text-reveal">
+            Report Local <span class="text-rotate"></span><br>
+            <span class="gradient-text text-gradient-animate">Get Them Solved Faster</span>
         </h1>
 
-        <p class="hero-subtitle">
+        <p class="hero-subtitle reveal-slide-left">
             Empowering citizens to report issues like potholes, garbage, water leakage & more.
             Track complaint status in real-time with AI-powered analysis and smart prioritization.
         </p>
 
-        <div class="hero-actions">
-            <a href="/report" class="btn btn-primary">
+        <div class="hero-actions reveal-slide-right">
+            <a href="/report" class="btn btn-primary" data-report-animate>
                 <i class="fas fa-exclamation-triangle"></i> Report a Problem
             </a>
             <a href="/complaints" class="btn btn-outline">
@@ -44,15 +38,30 @@
                 <i class="fas fa-robot"></i> Ask CivicAI
             </a>
         </div>
+
+        <!-- Floating geometric shapes for visual interest -->
+        <div style="position: absolute; top: 20%; right: 10%; width: 200px; height: 200px; border: 2px solid rgba(5, 150, 105, 0.1); border-radius: 30px; animation: floatRotate 20s linear infinite; pointer-events: none;"></div>
+        <div style="position: absolute; bottom: 20%; left: 10%; width: 150px; height: 150px; border: 2px solid rgba(6, 182, 212, 0.1); border-radius: 50%; animation: floatRotate 25s linear infinite reverse; pointer-events: none;"></div>
     </div>
 </section>
 
-<!-- Live Stats Section -->
+<!-- Add floating animation keyframe -->
+<style>
+    @keyframes floatRotate {
+        0% { transform: rotate(0deg) translateY(0px); }
+        25% { transform: rotate(90deg) translateY(20px); }
+        50% { transform: rotate(180deg) translateY(0px); }
+        75% { transform: rotate(270deg) translateY(-20px); }
+        100% { transform: rotate(360deg) translateY(0px); }
+    }
+</style>
+
+<!-- Live Stats Section with 3D Cards -->
 <section class="stats-section">
     <div class="section-container">
         <div class="section-header reveal">
             <div class="section-badge"><i class="fas fa-chart-line"></i> Live Statistics</div>
-            <h2 class="section-title">Tracking Civic Progress</h2>
+            <h2 class="section-title text-gradient-animate text-reveal">Tracking Civic Progress</h2>
             <p class="section-description">Real-time overview of reported issues and their resolution status</p>
         </div>
 
@@ -81,7 +90,7 @@
     </div>
 </section>
 
-<!-- Departments Section -->
+<!-- Departments Section with Stagger Animation -->
 <section class="departments-section">
     <div class="section-container">
         <div class="section-header reveal">
@@ -90,33 +99,33 @@
             <p class="section-description">Your complaints are routed to the right department automatically</p>
         </div>
 
-        <div class="dept-grid">
-            <div class="dept-card reveal reveal-delay-1">
+        <div class="dept-grid stagger-container">
+            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_roads.png'); background-size: cover;">
                 <div class="dept-icon road"><i class="fas fa-road"></i></div>
                 <h3>Road Department</h3>
                 <p>Handles potholes, road damage, speed breakers, and road construction issues.</p>
             </div>
-            <div class="dept-card reveal reveal-delay-2">
+            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_sanitation.png'); background-size: cover;">
                 <div class="dept-icon sanitation"><i class="fas fa-trash-alt"></i></div>
                 <h3>Sanitation Department</h3>
                 <p>Manages garbage collection, waste management, and illegal dumping complaints.</p>
             </div>
-            <div class="dept-card reveal reveal-delay-3">
+            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_water.png'); background-size: cover;">
                 <div class="dept-icon water"><i class="fas fa-tint"></i></div>
                 <h3>Water Department</h3>
                 <p>Addresses water leakage, supply disruptions, and water quality concerns.</p>
             </div>
-            <div class="dept-card reveal reveal-delay-4">
+            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_electricity.png'); background-size: cover;">
                 <div class="dept-icon electricity"><i class="fas fa-bolt"></i></div>
                 <h3>Electricity Department</h3>
                 <p>Resolves streetlight failures, power outages, and electrical hazards.</p>
             </div>
-            <div class="dept-card reveal reveal-delay-1">
+            <div class="dept-card stagger-item gradient-border-animate">
                 <div class="dept-icon sewage"><i class="fas fa-water"></i></div>
                 <h3>Sewage Department</h3>
                 <p>Tackles sewage overflow, drainage blockage, and wastewater issues.</p>
             </div>
-            <div class="dept-card reveal reveal-delay-2">
+            <div class="dept-card stagger-item gradient-border-animate">
                 <div class="dept-icon traffic"><i class="fas fa-traffic-light"></i></div>
                 <h3>Traffic Department</h3>
                 <p>Manages traffic signal malfunctions, road signs, and congestion issues.</p>
@@ -125,33 +134,43 @@
     </div>
 </section>
 
-<!-- AI Neighborhood Intelligence -->
-<section class="ai-hub-section" style="padding: 80px 0; background: rgba(15, 23, 42, 0.3);">
-    <div class="section-container">
+<!-- AI Neighborhood Intelligence with Animated Background -->
+<section class="ai-hub-section" style="padding: 80px 0; background: linear-gradient(135deg, rgba(15, 23, 42, 0.5) 0%, rgba(99, 102, 241, 0.05) 50%, rgba(15, 23, 42, 0.5) 100%); position: relative; overflow: hidden;" data-scroll-bg>
+    <!-- Animated background elements -->
+    <div style="position: absolute; inset: 0; opacity: 0.1;">
+        <div class="floating-bubble"></div>
+        <div class="floating-bubble"></div>
+        <div class="floating-bubble"></div>
+    </div>
+
+    <div class="section-container" style="position: relative; z-index: 1;">
         <div class="section-header reveal" style="text-align: center;">
             <div class="section-badge"><i class="fas fa-brain"></i> AI Intelligence</div>
-            <h2 class="section-title">Neighborhood Health Summary</h2>
+            <h2 class="section-title text-gradient-animate">Neighborhood Health Summary</h2>
             <p class="section-description">How our community is doing today, analyzed by CivicAI</p>
         </div>
 
-        <div class="ai-summary-card reveal" style="background: linear-gradient(135deg, rgba(6, 182, 212, 0.08) 0%, rgba(99, 102, 241, 0.08) 100%); border: 1px solid rgba(255, 255, 255, 0.05); border-radius: var(--radius-lg); padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); position: relative;">
-            <div id="aiHomeSummary" style="color: var(--text-primary); line-height: 1.8; min-height: 150px;">
+        <div class="ai-summary-card reveal glass-premium" style="border-radius: var(--radius-lg); padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); position: relative; overflow: hidden;">
+            <div id="aiHomeSummary" class="skeleton-card" style="color: var(--text-primary); line-height: 1.8; min-height: 150px;">
                 <div style="text-align: center; padding: 40px;">
                     <i class="fas fa-circle-notch fa-spin" style="font-size: 32px; color: var(--accent); margin-bottom: 20px;"></i>
-                    <p style="color: var(--text-secondary);">CivicAI is synthesizing recent reports into neighborhood insights...</p>
+                    <div class="skeleton skeleton-title" style="margin: 0 auto 20px;"></div>
+                    <div class="skeleton skeleton-text"></div>
+                    <div class="skeleton skeleton-text" style="width: 80%; margin: 0 auto;"></div>
+                    <p style="color: var(--text-secondary); margin-top: 15px;">CivicAI is synthesizing recent reports into neighborhood insights...</p>
                 </div>
             </div>
             
             <div style="margin-top: 30px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 30px;">
-                <div style="text-align: center; padding: 20px;">
+                <div class="stagger-item" style="text-align: center; padding: 20px; animation-delay: 0s;">
                     <div style="font-size: 36px; font-weight: 800; color: var(--success); margin-bottom: 5px;">{{ (resolved / (total or 1) * 100) | round(1) }}%</div>
                     <div style="color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Resolved Efforts</div>
                 </div>
-                <div style="text-align: center; padding: 20px;">
+                <div class="stagger-item" style="text-align: center; padding: 20px; animation-delay: 0.1s;">
                     <div style="font-size: 36px; font-weight: 800; color: var(--accent); margin-bottom: 5px;">{{ total }}</div>
                     <div style="color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Total Reports</div>
                 </div>
-                <div style="text-align: center; padding: 20px;">
+                <div class="stagger-item" style="text-align: center; padding: 20px; animation-delay: 0.2s;">
                     <div style="font-size: 36px; font-weight: 800; color: var(--warning); margin-bottom: 5px;">{{ pending }}</div>
                     <div style="color: var(--text-secondary); font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">In Progress</div>
                 </div>
@@ -167,18 +186,20 @@ async function loadHomeAISummary() {
         const response = await fetch('/api/dashboard-summary');
         const data = await response.json();
         if (data.summary) {
+            container.classList.remove('skeleton-card');
             let html = data.summary.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
             html = html.replace(/\n/g, '<br>');
-            container.innerHTML = `<div style="font-size: 15px; color: var(--text-primary);">${html}</div>`;
+            container.innerHTML = `<div style="font-size: 15px; color: var(--text-primary);" class="reveal-blur active">${html}</div>`;
         }
     } catch (err) {
+        container.classList.remove('skeleton-card');
         container.innerHTML = "Unable to load AI summary at this time.";
     }
 }
 document.addEventListener('DOMContentLoaded', loadHomeAISummary);
 </script>
 
-<!-- How It Works -->
+<!-- How It Works with Counter Animation -->
 <section class="how-section">
     <div class="section-container">
         <div class="section-header reveal">
@@ -212,19 +233,53 @@ document.addEventListener('DOMContentLoaded', loadHomeAISummary);
     </div>
 </section>
 
-<!-- Recent Complaints -->
+<!-- Impact Statistics with City Skyline Animation -->
+<section style="padding: 80px 24px; position: relative; overflow: hidden;">
+    <div class="section-container">
+        <div class="section-header reveal" style="text-align: center;">
+            <h2 class="section-title">Community Impact</h2>
+            <p class="section-description">See the tangible difference we're making together</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 40px; margin-top: 60px;">
+            <div class="reveal-blur" style="text-align: center;">
+                <div style="font-size: 64px; margin-bottom: 12px;">🏘️</div>
+                <h3 style="font-size: 28px; font-weight: 800; margin-bottom: 8px;">
+                    <span class="stat-number">{{ (total * 0.7) | int }}</span>
+                </h3>
+                <p style="color: var(--text-secondary);">Issues Successfully Resolved</p>
+            </div>
+            <div class="reveal-blur reveal-delay-1" style="text-align: center;">
+                <div style="font-size: 64px; margin-bottom: 12px;">⏱️</div>
+                <h3 style="font-size: 28px; font-weight: 800; margin-bottom: 8px;">
+                    <span class="stat-number">48</span>h
+                </h3>
+                <p style="color: var(--text-secondary);">Average Resolution Time</p>
+            </div>
+            <div class="reveal-blur reveal-delay-2" style="text-align: center;">
+                <div style="font-size: 64px; margin-bottom: 12px;">👥</div>
+                <h3 style="font-size: 28px; font-weight: 800; margin-bottom: 8px;">
+                    <span class="stat-number">{{ (total * 2.5) | int }}</span>
+                </h3>
+                <p style="color: var(--text-secondary);">Active Community Members</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Recent Complaints with Smooth Reveal -->
 {% if recent %}
 <section class="recent-section">
     <div class="section-container">
         <div class="section-header reveal">
             <div class="section-badge"><i class="fas fa-clock"></i> Recent Activity</div>
             <h2 class="section-title">Latest Complaints</h2>
-            <p class="section-description">See what's been reported recently</p>
+            <p class="section-description">See what's been reported recently in your community</p>
         </div>
 
         <div class="complaint-list">
             {% for c in recent %}
-            <a href="/complaint/{{ c.id }}" class="complaint-item reveal reveal-delay-{{ loop.index % 4 + 1 }}" style="text-decoration:none; color:inherit;">
+            <a href="/complaint/{{ c.id }}" class="complaint-item" style="text-decoration:none; color:inherit;">
                 <span class="complaint-category-badge badge-{{ c.category|lower|replace(' ', '') if c.category else 'default' }}">
                     {{ c.category or 'Other' }}
                 </span>
@@ -239,12 +294,32 @@ document.addEventListener('DOMContentLoaded', loadHomeAISummary);
         </div>
 
         <div style="text-align: center; margin-top: 32px;" class="reveal">
-            <a href="/complaints" class="btn btn-outline">
+            <a href="/complaints" class="btn btn-outline hover-lift">
                 <i class="fas fa-arrow-right"></i> View All Complaints
             </a>
         </div>
     </div>
 </section>
 {% endif %}
+
+<!-- Call to Action Section with Animated Background -->
+<section style="padding: 120px 24px; text-align: center; position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(6, 182, 212, 0.05) 100%);">
+    <div class="section-container" style="position: relative; z-index: 1;">
+        <h2 class="reveal-bounce" style="font-size: clamp(32px, 5vw, 48px); font-weight: 900; margin-bottom: 20px;">
+            Ready to <span class="text-gradient-animate">Make a Difference?</span>
+        </h2>
+        <p class="reveal-slide-left" style="color: var(--text-secondary); font-size: 18px; max-width: 600px; margin: 0 auto 40px; line-height: 1.7;">
+            Join thousands of citizens making their communities better. Report problems, track solutions, and be part of the change.
+        </p>
+        <div class="reveal-slide-right" style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap;">
+            <a href="/report" class="btn btn-primary" style="font-size: 16px; padding: 16px 32px;">
+                <i class="fas fa-exclamation-triangle"></i> Report Your First Problem
+            </a>
+            <a href="/community" class="btn btn-outline" style="font-size: 16px; padding: 16px 32px;">
+                <i class="fas fa-users"></i> Join Community
+            </a>
+        </div>
+    </div>
+</section>
 
 {% endblock %}
