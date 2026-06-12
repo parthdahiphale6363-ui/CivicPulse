@@ -8,4 +8,7 @@ torch
 numpy
 geopy
 twilio
-gunicorn
+Flask-Limiter
+Flask-WTF
+Flask-SQLAlchemy
+SQLAlchemy
