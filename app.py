@@ -2054,7 +2054,9 @@ def favicon():
 # --- NEW AMAZING AI FEATURES ---
 @app.route('/api/ripple-effect/<int:id>')
 def api_ripple_effect(id):
-    complaint = query_db('SELECT * FROM complaints WHERE id = ?', [id], one=True)
+    conn = get_db_connection()
+    complaint = conn.execute('SELECT * FROM complaints WHERE id = ?', (id,)).fetchone()
+    conn.close()
     if not complaint:
         return jsonify({'error': 'Complaint not found'})
     
@@ -2065,7 +2067,9 @@ def api_ripple_effect(id):
     """
     
     try:
-        response = call_groq_llama(prompt)
+        response = ask_groq(prompt, "You are a civic impact analyst. Be concise and impactful.")
+        if not response:
+            return jsonify({'error': 'AI service unavailable'})
         lines = [line.strip() for line in response.split('\n') if line.strip() and (line.startswith('Immediate') or line.startswith('Secondary') or line.startswith('Long-Term') or line.startswith('1.') or line.startswith('2.') or line.startswith('3.') or line.startswith('-'))]
         if not lines:
             lines = [response]
@@ -2078,7 +2082,9 @@ def api_resource_matrix(id):
     if 'user_id' not in session or session.get('role') != 'admin':
         return jsonify({'error': 'Unauthorized'}), 403
         
-    complaint = query_db('SELECT * FROM complaints WHERE id = ?', [id], one=True)
+    conn = get_db_connection()
+    complaint = conn.execute('SELECT * FROM complaints WHERE id = ?', (id,)).fetchone()
+    conn.close()
     if not complaint:
         return jsonify({'error': 'Complaint not found'})
         
@@ -2092,7 +2098,9 @@ def api_resource_matrix(id):
     """
     
     try:
-        response = call_groq_llama(prompt)
+        response = ask_groq(prompt, "You are a municipal operations budget analyst. Be precise.")
+        if not response:
+            return jsonify({'error': 'AI service unavailable'})
         return jsonify({'success': True, 'matrix': response})
     except Exception as e:
         return jsonify({'error': str(e)})

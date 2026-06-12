@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='animations.css') }}">
     {% block extra_css %}{% endblock %}
+    <script type="module" src="https://unpkg.com/@splinetool/viewer@1.9.82/build/spline-viewer.js"></script>
 </head>
 
 <body>
@@ -68,7 +69,6 @@
                             </div>
                         </div>
                         <a href="/dashboard" class="nav-link"><i class="fas fa-chart-bar"></i> Dashboard</a>
-                        <a href="/city-twin" class="nav-link" style="color: var(--accent); font-weight: 800;"><i class="fas fa-project-diagram"></i> City Twin</a>
                     {% endif %}
 
                     <!-- Profile Dropdown -->

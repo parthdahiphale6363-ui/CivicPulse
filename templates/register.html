@@ -27,9 +27,43 @@
                 <label><i class="fas fa-envelope"></i> Gmail Address</label>
                 <div class="input-verify-wrap">
                     <input type="email" name="email" id="emailInput" placeholder="example@gmail.com" required>
-                    <button type="button" class="btn-verify" onclick="simulateVerify(event, 'email')">Verify</button>
+                    <button type="button" class="btn-verify" id="sendOtpBtn" onclick="sendOtpToEmail()">
+                        <i class="fas fa-paper-plane"></i> Send OTP
+                    </button>
                 </div>
                 <div id="emailMsg" class="verify-msg"></div>
+            </div>
+
+            <!-- OTP Entry Section - Hidden by default, shown after OTP is sent -->
+            <div class="form-group" id="otpSection" style="display: none;">
+                <label><i class="fas fa-shield-alt"></i> Enter Verification Code</label>
+                <p class="otp-instruction">A 6-digit code has been sent to your Gmail. Enter it below:</p>
+                <div class="otp-input-container" id="otpContainer">
+                    <input type="text" class="otp-digit" maxlength="1" data-index="0" inputmode="numeric" autocomplete="one-time-code">
+                    <input type="text" class="otp-digit" maxlength="1" data-index="1" inputmode="numeric">
+                    <input type="text" class="otp-digit" maxlength="1" data-index="2" inputmode="numeric">
+                    <span class="otp-separator">—</span>
+                    <input type="text" class="otp-digit" maxlength="1" data-index="3" inputmode="numeric">
+                    <input type="text" class="otp-digit" maxlength="1" data-index="4" inputmode="numeric">
+                    <input type="text" class="otp-digit" maxlength="1" data-index="5" inputmode="numeric">
+                </div>
+                <div class="otp-actions">
+                    <button type="button" class="btn-verify-otp" id="verifyOtpBtn" onclick="verifyEnteredOtp()" disabled>
+                        <i class="fas fa-check-circle"></i> Verify Code
+                    </button>
+                    <button type="button" class="btn-resend" id="resendBtn" onclick="sendOtpToEmail()" disabled>
+                        <i class="fas fa-redo"></i> Resend (<span id="resendTimer">30</span>s)
+                    </button>
+                </div>
+                <div id="otpVerifyMsg" class="verify-msg"></div>
+            </div>
+
+            <!-- Verified Badge - shown after successful verification -->
+            <div class="form-group" id="verifiedBadge" style="display: none;">
+                <div class="verified-confirmation">
+                    <i class="fas fa-check-circle"></i>
+                    <span>Email Verified Successfully!</span>
+                </div>
             </div>
 
             <div class="form-group">
@@ -39,7 +73,13 @@
 
             <div class="form-group">
                 <label><i class="fas fa-lock"></i> Password</label>
-                <input type="password" name="password" placeholder="Create a password" required minlength="6">
+                <div class="password-wrap">
+                    <input type="password" name="password" id="passwordInput" placeholder="Create a password (min 6 chars)" required minlength="6">
+                    <button type="button" class="btn-toggle-pass" onclick="togglePassword()">
+                        <i class="fas fa-eye" id="passToggleIcon"></i>
+                    </button>
+                </div>
+                <div class="password-strength" id="passwordStrength"></div>
             </div>
 
             <button type="submit" class="btn btn-primary" style="width: 100%; justify-content: center;" id="registerBtn" disabled>
@@ -84,6 +124,10 @@
     color: white;
     cursor: default;
 }
+.btn-verify:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
 .verify-msg {
     font-size: 12px;
     margin-top: 4px;
@@ -93,82 +137,466 @@
 .msg-success { color: var(--success); }
 .msg-error { color: var(--danger); }
 
+/* OTP Input Styles */
+.otp-instruction {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    line-height: 1.4;
+}
+
+.otp-input-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+}
+
+.otp-digit {
+    width: 48px !important;
+    height: 56px !important;
+    text-align: center;
+    font-size: 22px !important;
+    font-weight: 700;
+    letter-spacing: 0;
+    border: 2px solid rgba(99, 102, 241, 0.2) !important;
+    border-radius: 12px !important;
+    background: rgba(15, 23, 42, 0.7) !important;
+    color: #ffffff !important;
+    transition: all 0.3s ease;
+    caret-color: #ffffff;
+    padding: 0 !important;
+}
+
+.otp-digit:focus {
+    border-color: var(--primary) !important;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2), 0 0 20px rgba(99, 102, 241, 0.1);
+    background: rgba(15, 23, 42, 0.9) !important;
+    transform: scale(1.05);
+}
+
+.otp-digit.filled {
+    border-color: var(--primary) !important;
+    background: rgba(99, 102, 241, 0.08) !important;
+}
+
+.otp-digit.error {
+    border-color: var(--danger) !important;
+    animation: shake 0.5s ease;
+}
+
+.otp-digit.success {
+    border-color: var(--success) !important;
+    background: rgba(34, 197, 94, 0.08) !important;
+}
+
+.otp-separator {
+    color: var(--text-muted);
+    font-size: 18px;
+    font-weight: 300;
+    margin: 0 2px;
+}
+
+.otp-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.btn-verify-otp {
+    flex: 1;
+    padding: 10px 16px;
+    background: linear-gradient(135deg, var(--primary), #818cf8);
+    border: none;
+    color: white;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.btn-verify-otp:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+}
+.btn-verify-otp:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-resend {
+    padding: 10px 16px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+.btn-resend:hover:not(:disabled) {
+    border-color: var(--primary);
+    color: var(--primary-light);
+}
+.btn-resend:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Verified Badge */
+.verified-confirmation {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 14px 18px;
+    background: rgba(34, 197, 94, 0.08);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: var(--radius-md);
+    color: var(--success);
+    font-weight: 600;
+    font-size: 14px;
+    animation: slideDown 0.4s ease;
+}
+.verified-confirmation i {
+    font-size: 20px;
+    animation: popIn 0.5s ease;
+}
+
+/* Password Strength */
+.password-wrap {
+    display: flex;
+    gap: 8px;
+}
+.password-wrap input { flex: 1; }
+.btn-toggle-pass {
+    padding: 0 14px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+.btn-toggle-pass:hover { color: var(--primary-light); }
+
+.password-strength {
+    height: 3px;
+    margin-top: 6px;
+    border-radius: 3px;
+    transition: all 0.4s ease;
+}
+
 #registerBtn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
     background: #475569;
 }
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20%, 60% { transform: translateX(-6px); }
+    40%, 80% { transform: translateX(6px); }
+}
+
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes popIn {
+    0% { transform: scale(0); }
+    60% { transform: scale(1.3); }
+    100% { transform: scale(1); }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .otp-digit {
+        width: 40px !important;
+        height: 48px !important;
+        font-size: 18px !important;
+    }
+    .otp-actions {
+        flex-direction: column;
+    }
+    .btn-resend { width: 100%; text-align: center; }
+}
 </style>
 
 <script>
 let emailVerified = false;
+let resendCountdown = null;
 
+// ==================== OTP DIGIT INPUTS ====================
+document.addEventListener('DOMContentLoaded', function() {
+    const otpDigits = document.querySelectorAll('.otp-digit');
+    
+    otpDigits.forEach((input, index) => {
+        // Auto-focus next on input
+        input.addEventListener('input', function(e) {
+            const value = this.value.replace(/\D/g, '');
+            this.value = value;
+            
+            if (value) {
+                this.classList.add('filled');
+                // Move to next input
+                if (index < otpDigits.length - 1) {
+                    otpDigits[index + 1].focus();
+                }
+            } else {
+                this.classList.remove('filled');
+            }
+            
+            // Enable verify button if all digits are filled
+            checkOtpComplete();
+        });
+        
+        // Handle backspace
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !this.value && index > 0) {
+                otpDigits[index - 1].focus();
+                otpDigits[index - 1].value = '';
+                otpDigits[index - 1].classList.remove('filled');
+            }
+            // Handle Enter key
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const verifyBtn = document.getElementById('verifyOtpBtn');
+                if (!verifyBtn.disabled) {
+                    verifyEnteredOtp();
+                }
+            }
+        });
+        
+        // Handle paste (paste full OTP code)
+        input.addEventListener('paste', function(e) {
+            e.preventDefault();
+            const pasteData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+            
+            pasteData.split('').forEach((digit, i) => {
+                if (otpDigits[i]) {
+                    otpDigits[i].value = digit;
+                    otpDigits[i].classList.add('filled');
+                }
+            });
+            
+            // Focus last filled or first empty
+            const focusIdx = Math.min(pasteData.length, otpDigits.length - 1);
+            otpDigits[focusIdx].focus();
+            checkOtpComplete();
+        });
+        
+        // Allow only digits
+        input.addEventListener('keypress', function(e) {
+            if (!/\d/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Tab' && e.key !== 'Enter') {
+                e.preventDefault();
+            }
+        });
+    });
+    
+    // Password strength checker
+    const passInput = document.getElementById('passwordInput');
+    if (passInput) {
+        passInput.addEventListener('input', function() {
+            updatePasswordStrength(this.value);
+        });
+    }
+});
+
+function checkOtpComplete() {
+    const digits = document.querySelectorAll('.otp-digit');
+    const allFilled = Array.from(digits).every(d => d.value.length === 1);
+    document.getElementById('verifyOtpBtn').disabled = !allFilled;
+}
+
+function getOtpValue() {
+    const digits = document.querySelectorAll('.otp-digit');
+    return Array.from(digits).map(d => d.value).join('');
+}
+
+// ==================== EMAIL VALIDATION ====================
 function validateEmail(email) {
     return /^[a-zA-Z0-9._%+-]+@gmail\.com$/.test(email);
 }
 
-function simulateVerify(event, type) {
-    const btn = event.currentTarget;
-    const input = document.getElementById(type + 'Input');
-    const msg = document.getElementById(type + 'Msg');
-    const value = input.value.trim();
-
-    if (!validateEmail(value)) {
-        msg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> Only verified @gmail.com addresses</span>';
+// ==================== SEND OTP ====================
+function sendOtpToEmail() {
+    const emailInput = document.getElementById('emailInput');
+    const sendBtn = document.getElementById('sendOtpBtn');
+    const emailMsg = document.getElementById('emailMsg');
+    const email = emailInput.value.trim();
+    
+    if (!validateEmail(email)) {
+        emailMsg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> Only verified @gmail.com addresses accepted</span>';
         return;
     }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-    msg.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-envelope"></i> Sending real OTP...</span>';
-
+    
+    sendBtn.disabled = true;
+    sendBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sending...';
+    emailMsg.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-envelope"></i> Sending verification code to your Gmail...</span>';
+    
     fetch('/api/send-otp', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ email: value })
+        body: JSON.stringify({ email: email })
     })
     .then(res => res.json())
     .then(data => {
         if (data.success) {
-            const userOtp = prompt("REAL VERIFICATION: Check your Gmail for the 6-digit code:");
-            if (!userOtp) {
-                failVerify(btn, msg);
-                return;
-            }
+            // Show OTP section
+            document.getElementById('otpSection').style.display = 'block';
+            document.getElementById('otpSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
             
-            fetch('/api/verify-otp', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ otp: userOtp })
-            })
-            .then(res => res.json())
-            .then(vData => {
-                if (vData.success) {
-                    btn.innerHTML = '<i class="fas fa-check"></i> Verified';
-                    btn.className = 'btn-verify verified';
-                    msg.innerHTML = '<span class="msg-success"><i class="fas fa-check-circle"></i> Gmail verified!</span>';
-                    input.readOnly = true;
-                    emailVerified = true;
-                    document.getElementById('registerBtn').disabled = false;
-                } else {
-                    failVerify(btn, msg, vData.message);
-                }
-            });
+            // Focus first OTP digit
+            setTimeout(() => {
+                document.querySelector('.otp-digit[data-index="0"]').focus();
+            }, 400);
+            
+            sendBtn.innerHTML = '<i class="fas fa-check"></i> OTP Sent';
+            sendBtn.style.background = 'rgba(34, 197, 94, 0.1)';
+            sendBtn.style.borderColor = 'var(--success)';
+            sendBtn.style.color = 'var(--success)';
+            emailMsg.innerHTML = '<span class="msg-success"><i class="fas fa-check-circle"></i> OTP sent! Check your inbox (and spam folder)</span>';
+            emailInput.readOnly = true;
+            
+            // Start resend countdown
+            startResendCountdown();
         } else {
-            failVerify(btn, msg, data.message);
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send OTP';
+            emailMsg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> ' + (data.message || 'Failed to send OTP. Try again.') + '</span>';
         }
     })
     .catch(err => {
-        failVerify(btn, msg, "Connection error.");
+        sendBtn.disabled = false;
+        sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Send OTP';
+        emailMsg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> Connection error. Please try again.</span>';
     });
 }
 
-function failVerify(btn, msg, errorText = "Verification failed.") {
-    btn.disabled = false;
-    btn.innerHTML = 'Verify';
-    msg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> ' + errorText + '</span>';
+// ==================== VERIFY OTP ====================
+function verifyEnteredOtp() {
+    const otpValue = getOtpValue();
+    const verifyBtn = document.getElementById('verifyOtpBtn');
+    const otpMsg = document.getElementById('otpVerifyMsg');
+    const digits = document.querySelectorAll('.otp-digit');
+    
+    if (otpValue.length !== 6) {
+        otpMsg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> Please enter all 6 digits</span>';
+        return;
+    }
+    
+    verifyBtn.disabled = true;
+    verifyBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verifying...';
+    otpMsg.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-shield-alt"></i> Checking verification code...</span>';
+    
+    fetch('/api/verify-otp', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ otp: otpValue, type: 'email' })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // Success animation on digits
+            digits.forEach(d => {
+                d.classList.remove('error');
+                d.classList.add('success');
+                d.disabled = true;
+            });
+            
+            // Hide OTP section, show verified badge
+            setTimeout(() => {
+                document.getElementById('otpSection').style.display = 'none';
+                document.getElementById('verifiedBadge').style.display = 'block';
+                
+                // Update send button
+                const sendBtn = document.getElementById('sendOtpBtn');
+                sendBtn.innerHTML = '<i class="fas fa-check"></i> Verified';
+                sendBtn.className = 'btn-verify verified';
+            }, 800);
+            
+            emailVerified = true;
+            document.getElementById('registerBtn').disabled = false;
+            
+            // Stop resend countdown
+            if (resendCountdown) clearInterval(resendCountdown);
+        } else {
+            // Error animation on digits
+            digits.forEach(d => {
+                d.classList.add('error');
+                setTimeout(() => d.classList.remove('error'), 600);
+            });
+            
+            verifyBtn.disabled = false;
+            verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Code';
+            otpMsg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> ' + (data.message || 'Invalid code. Please try again.') + '</span>';
+            
+            // Clear and refocus
+            digits.forEach(d => { d.value = ''; d.classList.remove('filled'); });
+            digits[0].focus();
+        }
+    })
+    .catch(err => {
+        verifyBtn.disabled = false;
+        verifyBtn.innerHTML = '<i class="fas fa-check-circle"></i> Verify Code';
+        otpMsg.innerHTML = '<span class="msg-error"><i class="fas fa-times"></i> Connection error. Try again.</span>';
+    });
+}
+
+// ==================== RESEND COUNTDOWN ====================
+function startResendCountdown() {
+    let seconds = 30;
+    const resendBtn = document.getElementById('resendBtn');
+    const timerSpan = document.getElementById('resendTimer');
+    
+    resendBtn.disabled = true;
+    timerSpan.textContent = seconds;
+    
+    resendCountdown = setInterval(() => {
+        seconds--;
+        timerSpan.textContent = seconds;
+        
+        if (seconds <= 0) {
+            clearInterval(resendCountdown);
+            resendBtn.disabled = false;
+            resendBtn.innerHTML = '<i class="fas fa-redo"></i> Resend OTP';
+        }
+    }, 1000);
+}
+
+// ==================== PASSWORD TOGGLE & STRENGTH ====================
+function togglePassword() {
+    const input = document.getElementById('passwordInput');
+    const icon = document.getElementById('passToggleIcon');
+    if (input.type === 'password') {
+        input.type = 'text';
+        icon.className = 'fas fa-eye-slash';
+    } else {
+        input.type = 'password';
+        icon.className = 'fas fa-eye';
+    }
+}
+
+function updatePasswordStrength(password) {
+    const bar = document.getElementById('passwordStrength');
+    let score = 0;
+    if (password.length >= 6) score++;
+    if (password.length >= 10) score++;
+    if (/[A-Z]/.test(password)) score++;
+    if (/[0-9]/.test(password)) score++;
+    if (/[^A-Za-z0-9]/.test(password)) score++;
+    
+    const colors = ['transparent', '#ef4444', '#f97316', '#eab308', '#22c55e', '#06b6d4'];
+    const widths = ['0%', '20%', '40%', '60%', '80%', '100%'];
+    
+    bar.style.width = widths[score];
+    bar.style.background = colors[score];
 }
 </script>
-    </div>
-</div>
 {% endblock %}

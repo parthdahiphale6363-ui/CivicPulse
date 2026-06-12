@@ -2,51 +2,285 @@
 {% block title %}CivicPulse — Smart Local Problem Reporting System{% endblock %}
 
 {% block content %}
-<!-- Hero Section with Enhanced Animations -->
-<section class="hero">
+<!-- Hero Section with Spline 3D -->
+<section class="hero hero-split relative" style="background-color: #fafcff;">
+    <!-- Animated Glow Blobs Background -->
+    <div class="hero-glow-blob blob-1"></div>
+    <div class="hero-glow-blob blob-2"></div>
+    <div class="hero-glow-blob blob-3"></div>
+
+    <!-- Subtle Grid Overlay -->
+    <div class="hero-grid-overlay"></div>
+
     <div class="hero-video-container">
-        <video autoplay muted loop playsinline class="hero-video">
+        <video autoplay muted loop playsinline class="hero-video" style="opacity: 0.15; mix-blend-mode: overlay;">
             <source src="https://assets.mixkit.co/videos/preview/mixkit-daytime-timelapse-of-a-busy-city-avenue-3430-large.mp4" type="video/mp4">
         </video>
-        <div class="video-overlay"></div>
+        <div class="video-overlay" style="background: linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.85) 100%); backdrop-filter: blur(5px);"></div>
     </div>
 
-    <div class="hero-content">
-        <div class="hero-badge reveal">
-            <i class="fas fa-bolt"></i>
-            AI-Powered Civic Engagement Platform
+    <div class="hero-split-container">
+        <!-- Left Content -->
+        <div class="hero-left">
+            <div class="hero-badge reveal" style="background: linear-gradient(90deg, rgba(14, 165, 233, 0.1), rgba(99, 102, 241, 0.1)); border: 1px solid rgba(14, 165, 233, 0.3); color: var(--primary); box-shadow: 0 4px 15px rgba(14, 165, 233, 0.1);">
+                <i class="fas fa-robot" style="color: var(--accent);"></i>
+                <span style="font-weight: 700;">AI-Powered</span> Civic Engagement Platform
+            </div>
+
+            <h1 class="hero-title text-reveal" style="line-height: 1.15; font-size: clamp(40px, 5.5vw, 72px);">
+                Report Your <span class="text-rotate" style="color: var(--primary);"></span><br>
+                <span class="premium-gradient-text">Get Them Solved Faster</span>
+            </h1>
+
+            <p class="hero-subtitle reveal-slide-left" style="font-size: 18px; color: var(--text-secondary); max-width: 550px; line-height: 1.7; margin-bottom: 40px;">
+                Empowering citizens to report issues like potholes, garbage, water leakage & more.
+                Track complaint status in real-time with <strong style="color: var(--primary);">AI-powered analysis</strong> and smart prioritization.
+            </p>
+
+            <div class="hero-actions reveal-slide-right" style="gap: 16px;">
+                <a href="/report" class="btn btn-primary btn-glow" data-report-animate style="padding: 14px 28px; font-size: 16px; font-weight: 700; border-radius: var(--radius-full);">
+                    <i class="fas fa-bolt" style="color: #fbbf24;"></i> Report a Problem
+                </a>
+                <a href="/ai-chat" class="btn btn-glass" style="padding: 14px 28px; font-size: 16px; font-weight: 600; border-radius: var(--radius-full);">
+                    <i class="fas fa-robot" style="color: var(--accent);"></i> Ask CivicAI
+                </a>
+            </div>
+            
+
         </div>
 
-        <h1 class="hero-title text-reveal">
-            Report Local <span class="text-rotate"></span><br>
-            <span class="gradient-text text-gradient-animate">Get Them Solved Faster</span>
-        </h1>
+        <!-- Right Content — Spline 3D Scene -->
+        <div class="hero-right">
+            <div class="hero-ai-status">
+                <div class="reveal-bounce typing-bubble">
+                    <span style="display: inline-block; width: 6px; height: 6px; background: var(--success); border-radius: 50%; animation: pulseDot 2s infinite;"></span>
+                    <span id="aiTypingText">Initializing...</span>
+                    <span class="typing-cursor" style="animation: blinkCursor 1s infinite; font-weight: 800; color: var(--accent);">|</span>
+                </div>
+            </div>
 
-        <p class="hero-subtitle reveal-slide-left">
-            Empowering citizens to report issues like potholes, garbage, water leakage & more.
-            Track complaint status in real-time with AI-powered analysis and smart prioritization.
-        </p>
+            <div class="spline-container spline-container-enhanced" style="position: relative; transition: transform 0.3s ease; width: 100%; height: 600px;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+                <!-- Live Statistics under Robot (Floating Bottom) -->
+                <div class="reveal-bounce" style="position: absolute; bottom: -30px; left: 50%; transform: translateX(-50%); display: flex; justify-content: space-between; gap: 10px; width: 90%; max-width: 450px; padding: 16px 20px; background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(12px); border-radius: var(--radius-xl); border: 1px solid rgba(255, 255, 255, 0.9); box-shadow: 0 15px 35px rgba(14, 165, 233, 0.15); z-index: 20; pointer-events: none;">
+                    <div style="text-align: center; flex: 1;">
+                        <div id="heroTotalComplaints" style="font-size: 22px; font-weight: 900; color: var(--primary); margin-bottom: 2px;">{{ "{:,}".format(total) }}</div>
+                        <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Total Complaints</div>
+                    </div>
+                    <div style="width: 1px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.1), transparent);"></div>
+                    <div style="text-align: center; flex: 1;">
+                        <div id="heroSuccessRate" style="font-size: 22px; font-weight: 900; color: var(--success); margin-bottom: 2px;">{{ "{}%".format(((resolved / total * 100) | round(0)) if total else 0) }}</div>
+                        <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Success Rate</div>
+                    </div>
+                    <div style="width: 1px; background: linear-gradient(to bottom, transparent, rgba(0,0,0,0.1), transparent);"></div>
+                    <div style="text-align: center; flex: 1;">
+                        <div style="font-size: 22px; font-weight: 900; color: #8b5cf6; margin-bottom: 2px;">24/7</div>
+                        <div style="font-size: 10px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">AI Support</div>
+                    </div>
+                </div>
 
-        <div class="hero-actions reveal-slide-right">
-            <a href="/report" class="btn btn-primary" data-report-animate>
-                <i class="fas fa-exclamation-triangle"></i> Report a Problem
-            </a>
-            <a href="/complaints" class="btn btn-outline">
-                <i class="fas fa-list-alt"></i> View Complaints
-            </a>
-            <a href="/ai-chat" class="btn btn-outline">
-                <i class="fas fa-robot"></i> Ask CivicAI
-            </a>
+                <!-- Clickable overlay to open chatbot -->
+                <a href="/ai-chat" style="position: absolute; inset: 0; z-index: 10; cursor: pointer; display: block;" title="Chat with CivicAI"></a>
+                <div class="spline-loader" id="splineLoader">
+                    <div class="spline-loader-ring"></div>
+                    <span style="background: var(--gradient-primary); -webkit-background-clip: text; color: transparent;">Loading Civic AI...</span>
+                </div>
+                <spline-viewer 
+                    url="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+                    loading="lazy"
+                    events-target="global"
+                ></spline-viewer>
+            </div>
+
+            <!-- Floating decorative elements around the 3D scene -->
+            <div class="hero-float-circle hero-float-1" style="border-color: rgba(14, 165, 233, 0.4); border-width: 3px;"></div>
+            <div class="hero-float-circle hero-float-2" style="background: linear-gradient(135deg, var(--primary), var(--accent)); border: none; opacity: 0.1;"></div>
+            <div class="hero-float-dot hero-float-3" style="box-shadow: 0 0 15px var(--accent);"></div>
+            <div class="hero-float-dot" style="position: absolute; bottom: 70%; left: 5%; animation: pulseDot 4s infinite; animation-delay: 1s; width: 14px; height: 14px; border-radius: 50%; background: #8b5cf6;"></div>
         </div>
-
-        <!-- Floating geometric shapes for visual interest -->
-        <div style="position: absolute; top: 20%; right: 10%; width: 200px; height: 200px; border: 2px solid rgba(5, 150, 105, 0.1); border-radius: 30px; animation: floatRotate 20s linear infinite; pointer-events: none;"></div>
-        <div style="position: absolute; bottom: 20%; left: 10%; width: 150px; height: 150px; border: 2px solid rgba(6, 182, 212, 0.1); border-radius: 50%; animation: floatRotate 25s linear infinite reverse; pointer-events: none;"></div>
     </div>
 </section>
 
-<!-- Add floating animation keyframe -->
+<!-- AI Scripts for Typing Effect & City Guide -->
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // Live Typing Effect
+        const typingTexts = [
+            "Analyzing city reports...",
+            "Monitoring infrastructure...",
+            "Ready to assist..."
+        ];
+        let typingIndex = 0;
+        let charIndex = 0;
+        let isDeleting = false;
+        const typingElement = document.getElementById('aiTypingText');
+        
+        function typeEffect() {
+            if (!typingElement) return;
+            const currentText = typingTexts[typingIndex];
+            
+            if (isDeleting) {
+                typingElement.textContent = currentText.substring(0, charIndex - 1);
+                charIndex--;
+            } else {
+                typingElement.textContent = currentText.substring(0, charIndex + 1);
+                charIndex++;
+            }
+            
+            let typingSpeed = isDeleting ? 30 : 60;
+            
+            if (!isDeleting && charIndex === currentText.length) {
+                typingSpeed = 3000; // Pause at end before deleting
+                isDeleting = true;
+            } else if (isDeleting && charIndex === 0) {
+                isDeleting = false;
+                typingIndex = (typingIndex + 1) % typingTexts.length;
+                typingSpeed = 500; // Pause before next word starts typing
+            }
+            
+            setTimeout(typeEffect, typingSpeed);
+        }
+        
+        // Start typing effect slightly after load
+        setTimeout(typeEffect, 1500);
+
+        // Dynamic hero stats from live backend data
+        const heroTotalComplaints = document.getElementById('heroTotalComplaints');
+        const heroSuccessRate = document.getElementById('heroSuccessRate');
+
+        async function updateHeroStats() {
+            try {
+                const response = await fetch('/api/stats');
+                if (!response.ok) return;
+                const data = await response.json();
+                const total = data.total || 0;
+                const resolved = data.resolved || 0;
+                const success = total ? Math.round((resolved / total) * 100) : 0;
+
+                if (heroTotalComplaints) {
+                    heroTotalComplaints.textContent = total.toLocaleString();
+                }
+                if (heroSuccessRate) {
+                    heroSuccessRate.textContent = `${success}%`;
+                }
+            } catch (error) {
+                console.error('Failed to update hero stats:', error);
+            }
+        }
+
+        updateHeroStats();
+        setInterval(updateHeroStats, 10000);
+
+        // City Guide Inactivity Notification
+        const robotNotif = document.getElementById('robotNotification');
+        const robotNotifText = document.getElementById('robotNotificationText');
+        const insights = [
+            "Did you know? Pothole repairs are up 20% this month.",
+            "3 new complaints resolved in your neighborhood today.",
+            "Water department is currently active in downtown.",
+            "Your reports help city planners allocate resources.",
+            "Click me to ask questions about your city!"
+        ];
+        
+        let inactivityTimer;
+        let insightInterval;
+        
+        function showRobotInsight() {
+            if (!robotNotif) return;
+            robotNotifText.textContent = insights[Math.floor(Math.random() * insights.length)];
+            robotNotif.style.opacity = '1';
+            robotNotif.style.transform = 'translateY(0) scale(1)';
+            
+            // Hide after 6 seconds
+            setTimeout(() => {
+                if (robotNotif.style.opacity === '1') {
+                    robotNotif.style.opacity = '0';
+                    robotNotif.style.transform = 'translateY(10px) scale(0.95)';
+                }
+            }, 6000);
+        }
+        
+        function resetInactivity() {
+            clearTimeout(inactivityTimer);
+            clearInterval(insightInterval);
+            
+            if (robotNotif) {
+                robotNotif.style.opacity = '0';
+                robotNotif.style.transform = 'translateY(10px) scale(0.95)';
+            }
+            
+            // Wait 5 seconds of inactivity before showing insights
+            inactivityTimer = setTimeout(() => {
+                showRobotInsight();
+                // Then show a new one every 10 seconds while inactive
+                insightInterval = setInterval(showRobotInsight, 10000);
+            }, 5000);
+        }
+        
+        // Listen to all activity events
+        document.addEventListener('mousemove', resetInactivity);
+        document.addEventListener('keypress', resetInactivity);
+        document.addEventListener('click', resetInactivity);
+        document.addEventListener('scroll', resetInactivity);
+        
+        // Initialize timer
+        resetInactivity();
+    });
+</script>
+
+<!-- Spotlight & Hero float animations -->
 <style>
+    /* Spotlight SVG animation */
+    .hero-spotlight {
+        pointer-events: none;
+        position: absolute;
+        z-index: 1;
+        top: -40%;
+        left: 0;
+        width: 138%;
+        height: 169%;
+        opacity: 0;
+        animation: spotlightReveal 2s ease-out 0.5s forwards;
+    }
+    @keyframes spotlightReveal {
+        0% { opacity: 0; transform: translateY(-20px); }
+        100% { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Floating shapes around 3D scene */
+    .hero-float-circle {
+        position: absolute;
+        border-radius: 50%;
+        border: 2px solid;
+        pointer-events: none;
+        opacity: 0.15;
+    }
+    .hero-float-1 {
+        width: 120px; height: 120px;
+        top: 5%; right: 0;
+        border-color: var(--accent);
+        animation: floatRotate 20s linear infinite;
+    }
+    .hero-float-2 {
+        width: 80px; height: 80px;
+        bottom: 10%; right: 10%;
+        border-color: var(--primary-light);
+        border-radius: 30%;
+        animation: floatRotate 25s linear infinite reverse;
+    }
+    .hero-float-dot {
+        position: absolute;
+        width: 10px; height: 10px;
+        background: var(--accent);
+        border-radius: 50%;
+        bottom: 30%; right: 5%;
+        pointer-events: none;
+        opacity: 0.3;
+        animation: pulseDot 3s ease-in-out infinite;
+    }
+    @keyframes pulseDot {
+        0%, 100% { transform: scale(1); opacity: 0.3; }
+        50% { transform: scale(1.8); opacity: 0.6; }
+    }
     @keyframes floatRotate {
         0% { transform: rotate(0deg) translateY(0px); }
         25% { transform: rotate(90deg) translateY(20px); }
@@ -55,6 +289,27 @@
         100% { transform: rotate(360deg) translateY(0px); }
     }
 </style>
+
+<script>
+    // Hide loader when Spline scene loads
+    document.addEventListener('DOMContentLoaded', function() {
+        const viewer = document.querySelector('spline-viewer');
+        const loader = document.getElementById('splineLoader');
+        if (viewer && loader) {
+            viewer.addEventListener('load', function() {
+                loader.style.opacity = '0';
+                setTimeout(() => loader.style.display = 'none', 400);
+            });
+            // Fallback: hide loader after 8s even if event doesn't fire
+            setTimeout(() => {
+                if (loader.style.display !== 'none') {
+                    loader.style.opacity = '0';
+                    setTimeout(() => loader.style.display = 'none', 400);
+                }
+            }, 8000);
+        }
+    });
+</script>
 
 <!-- Live Stats Section with 3D Cards -->
 <section class="stats-section">
@@ -100,22 +355,22 @@
         </div>
 
         <div class="dept-grid stagger-container">
-            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_roads.png'); background-size: cover;">
+            <div class="dept-card stagger-item gradient-border-animate">
                 <div class="dept-icon road"><i class="fas fa-road"></i></div>
                 <h3>Road Department</h3>
                 <p>Handles potholes, road damage, speed breakers, and road construction issues.</p>
             </div>
-            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_sanitation.png'); background-size: cover;">
+            <div class="dept-card stagger-item gradient-border-animate">
                 <div class="dept-icon sanitation"><i class="fas fa-trash-alt"></i></div>
                 <h3>Sanitation Department</h3>
                 <p>Manages garbage collection, waste management, and illegal dumping complaints.</p>
             </div>
-            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_water.png'); background-size: cover;">
+            <div class="dept-card stagger-item gradient-border-animate">
                 <div class="dept-icon water"><i class="fas fa-tint"></i></div>
                 <h3>Water Department</h3>
                 <p>Addresses water leakage, supply disruptions, and water quality concerns.</p>
             </div>
-            <div class="dept-card stagger-item gradient-border-animate" style="background-image: linear-gradient(rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.9)), url('/static/img/dept_electricity.png'); background-size: cover;">
+            <div class="dept-card stagger-item gradient-border-animate">
                 <div class="dept-icon electricity"><i class="fas fa-bolt"></i></div>
                 <h3>Electricity Department</h3>
                 <p>Resolves streetlight failures, power outages, and electrical hazards.</p>
@@ -135,7 +390,7 @@
 </section>
 
 <!-- AI Neighborhood Intelligence with Animated Background -->
-<section class="ai-hub-section" style="padding: 80px 0; background: linear-gradient(135deg, rgba(15, 23, 42, 0.5) 0%, rgba(99, 102, 241, 0.05) 50%, rgba(15, 23, 42, 0.5) 100%); position: relative; overflow: hidden;" data-scroll-bg>
+<section class="ai-hub-section" style="padding: 80px 0; background: linear-gradient(135deg, var(--bg-secondary) 0%, rgba(99, 102, 241, 0.05) 50%, var(--bg-secondary) 100%); position: relative; overflow: hidden;" data-scroll-bg>
     <!-- Animated background elements -->
     <div style="position: absolute; inset: 0; opacity: 0.1;">
         <div class="floating-bubble"></div>
@@ -150,7 +405,7 @@
             <p class="section-description">How our community is doing today, analyzed by CivicAI</p>
         </div>
 
-        <div class="ai-summary-card reveal glass-premium" style="border-radius: var(--radius-lg); padding: 40px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); position: relative; overflow: hidden;">
+        <div class="ai-summary-card reveal" style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 40px; box-shadow: var(--shadow-xl); position: relative; overflow: hidden;">
             <div id="aiHomeSummary" class="skeleton-card" style="color: var(--text-primary); line-height: 1.8; min-height: 150px;">
                 <div style="text-align: center; padding: 40px;">
                     <i class="fas fa-circle-notch fa-spin" style="font-size: 32px; color: var(--accent); margin-bottom: 20px;"></i>

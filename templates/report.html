@@ -79,23 +79,58 @@
                 </div>
             </div>
 
-            <!-- Location with AI Enhance -->
+            <!-- Location with AI Enhance + Interactive Map -->
             <div class="form-group">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                     <label><i class="fas fa-map-marker-alt"></i> Location</label>
-                    <div style="display: flex; gap: 8px;">
+                    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
                         <button type="button" class="btn btn-sm btn-info" onclick="getCurrentLocation()" id="gpsBtn" 
                             style="background: rgba(59, 130, 246, 0.1); border: 1px solid var(--info); color: var(--info); padding: 4px 10px; font-size: 11px;">
-                            <i class="fas fa-crosshairs"></i> 📍 Use GPS
+                            <i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS
                         </button>
                         <button type="button" class="btn-ai-enhance" id="enhanceLocBtn" onclick="enhanceLocation()">
                             <i class="fas fa-magic"></i> AI Enhance
                         </button>
                     </div>
                 </div>
-                <input type="text" name="location" id="locationInput" placeholder="Enter the location (e.g., Main Road near City Mall)">
+
+                <!-- Address Search Bar -->
+                <div style="position: relative; margin-bottom: 10px;">
+                    <input type="text" name="location" id="locationInput" placeholder="🔍 Search address or click the map to pin location..." autocomplete="off"
+                        style="padding-right: 40px;">
+                    <button type="button" onclick="searchAddress()" id="searchAddrBtn"
+                        style="position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: var(--primary); border: none; color: white; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center;">
+                        <i class="fas fa-search"></i>
+                    </button>
+                </div>
                 <input type="hidden" name="latitude" id="latitudeInput" value="">
                 <input type="hidden" name="longitude" id="longitudeInput" value="">
+
+                <!-- Interactive Map Container -->
+                <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+                <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+                <div id="locationMapContainer" style="border-radius: 12px; overflow: hidden; border: 2px solid rgba(99, 102, 241, 0.2); margin-bottom: 10px; position: relative;">
+                    <div id="locationMap" style="height: 280px; width: 100%; z-index: 1;"></div>
+                    <div id="mapOverlay" style="position: absolute; top: 10px; left: 10px; z-index: 1000; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); padding: 8px 14px; border-radius: 10px; border: 1px solid rgba(99, 102, 241, 0.3); font-size: 11px; color: var(--text-secondary); pointer-events: none;">
+                        <i class="fas fa-hand-pointer" style="color: var(--primary-light); margin-right: 4px;"></i> Click map to pin exact location
+                    </div>
+                </div>
+
+                <!-- Coordinates Display -->
+                <div id="coordsDisplay" style="display: none; padding: 10px 14px; background: rgba(99, 102, 241, 0.06); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 10px; margin-bottom: 10px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-satellite" style="color: var(--primary-light); font-size: 14px;"></i>
+                            <span style="font-size: 12px; color: var(--text-secondary);">
+                                <strong>Lat:</strong> <span id="coordLat">—</span> &nbsp;|&nbsp;
+                                <strong>Lng:</strong> <span id="coordLng">—</span>
+                            </span>
+                        </div>
+                        <div id="accuracyBadge" style="font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600; display: none;">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="ai-enhance-status" id="locEnhanceStatus" style="font-size: 11px; margin-top: 4px;"></div>
                 
                 <!-- Duplicate Detection Warning -->
@@ -140,57 +175,168 @@ input:checked + .slider-anon:before { transform: translateX(24px); }
 </style>
 
 <script>
+// ==================== LEAFLET MAP INITIALIZATION ====================
+let reportMap, reportMarker, accuracyCircle;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize map centered on India (default)
+    reportMap = L.map('locationMap', {
+        zoomControl: true,
+        attributionControl: false
+    }).setView([20.5937, 78.9629], 5);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19
+    }).addTo(reportMap);
+
+    // Click to place marker
+    reportMap.on('click', function(e) {
+        placeMarker(e.latlng.lat, e.latlng.lng);
+        reverseGeocode(e.latlng.lat, e.latlng.lng);
+    });
+
+    // Fix map render on tab/scroll visibility
+    setTimeout(() => reportMap.invalidateSize(), 300);
+});
+
+function placeMarker(lat, lng) {
+    if (reportMarker) {
+        reportMarker.setLatLng([lat, lng]);
+    } else {
+        reportMarker = L.marker([lat, lng], { draggable: true }).addTo(reportMap);
+        reportMarker.on('dragend', function(e) {
+            const pos = e.target.getLatLng();
+            reverseGeocode(pos.lat, pos.lng);
+            updateCoords(pos.lat, pos.lng);
+        });
+    }
+    reportMap.setView([lat, lng], Math.max(reportMap.getZoom(), 15));
+    updateCoords(lat, lng);
+    document.getElementById('mapOverlay').style.display = 'none';
+}
+
+function updateCoords(lat, lng) {
+    document.getElementById('latitudeInput').value = lat;
+    document.getElementById('longitudeInput').value = lng;
+    document.getElementById('coordLat').textContent = lat.toFixed(6);
+    document.getElementById('coordLng').textContent = lng.toFixed(6);
+    document.getElementById('coordsDisplay').style.display = 'block';
+    checkDuplicates(lat, lng);
+}
+
+function reverseGeocode(lat, lng) {
+    const input = document.getElementById('locationInput');
+    const status = document.getElementById('locEnhanceStatus');
+    status.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-spinner fa-spin"></i> Resolving address...</span>';
+
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.display_name) {
+                input.value = data.display_name;
+                status.innerHTML = '<span style="color: var(--success);"><i class="fas fa-check-circle"></i> Address resolved!</span>';
+            } else {
+                input.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+                status.innerHTML = '<span style="color: var(--warning);">Using coordinates (no address found)</span>';
+            }
+        })
+        .catch(() => {
+            input.value = `${lat.toFixed(6)}, ${lng.toFixed(6)}`;
+            status.innerHTML = '<span style="color: var(--warning);">Network error. Using coordinates.</span>';
+        });
+}
+
+// ==================== HIGH-ACCURACY GPS ====================
 function getCurrentLocation() {
     const btn = document.getElementById('gpsBtn');
     const status = document.getElementById('locEnhanceStatus');
-    const input = document.getElementById('locationInput');
 
     if (!navigator.geolocation) {
-        status.innerHTML = '<span style="color: var(--danger);">GPS not supported by browser</span>';
+        status.innerHTML = '<span style="color: var(--danger);">GPS not supported by your browser</span>';
         return;
     }
 
     btn.disabled = true;
-    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Locating...';
-    status.innerHTML = '<span style="color: var(--info);">Accessing satellite data...</span>';
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acquiring GPS...';
+    status.innerHTML = '<span style="color: var(--info);"><i class="fas fa-satellite-dish"></i> Requesting high-accuracy satellite fix...</span>';
 
     navigator.geolocation.getCurrentPosition(
         (position) => {
             const lat = position.coords.latitude;
             const lon = position.coords.longitude;
-            document.getElementById('latitudeInput').value = lat;
-            document.getElementById('longitudeInput').value = lon;
-            status.innerHTML = `<span style="color: var(--accent);">Found: ${lat.toFixed(4)}, ${lon.toFixed(4)}. Fetching address...</span>`;
+            const acc = position.coords.accuracy; // meters
 
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.display_name) {
-                        input.value = data.display_name;
-                        status.innerHTML = '<span style="color: var(--success);"><i class="fas fa-check"></i> Address updated!</span>';
-                    } else {
-                        input.value = `${lat}, ${lon}`;
-                        status.innerHTML = '<span style="color: var(--warning);">Using coordinates (address not found).</span>';
-                    }
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 Use GPS';
-                    checkDuplicates(lat, lon); // Smart Merge Check
-                })
-                .catch(() => {
-                    input.value = `${lat}, ${lon}`;
-                    status.innerHTML = '<span style="color: var(--warning);">Network error fetching address. Using raw coords.</span>';
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 Use GPS';
-                });
+            placeMarker(lat, lon);
+            reverseGeocode(lat, lon);
+            reportMap.setView([lat, lon], 17);
+
+            // Show accuracy circle
+            if (accuracyCircle) reportMap.removeLayer(accuracyCircle);
+            accuracyCircle = L.circle([lat, lon], {
+                radius: acc, color: '#6366f1', fillColor: '#6366f1',
+                fillOpacity: 0.08, weight: 1, dashArray: '5,5'
+            }).addTo(reportMap);
+
+            // Accuracy badge
+            const badge = document.getElementById('accuracyBadge');
+            badge.style.display = 'inline-block';
+            if (acc <= 20) {
+                badge.textContent = `± ${acc.toFixed(0)}m · Excellent`;
+                badge.style.background = 'rgba(34,197,94,0.15)'; badge.style.color = '#22c55e';
+            } else if (acc <= 100) {
+                badge.textContent = `± ${acc.toFixed(0)}m · Good`;
+                badge.style.background = 'rgba(59,130,246,0.15)'; badge.style.color = '#3b82f6';
+            } else {
+                badge.textContent = `± ${acc.toFixed(0)}m · Approximate`;
+                badge.style.background = 'rgba(245,158,11,0.15)'; badge.style.color = '#f59e0b';
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
         },
         (error) => {
-            status.innerHTML = '<span style="color: var(--danger);">GPS Access Denied. Please enable location permissions.</span>';
+            const msgs = {1:'Location permission denied',2:'Position unavailable',3:'Request timed out'};
+            status.innerHTML = `<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> ${msgs[error.code] || 'GPS error'}. Enable location in browser settings.</span>`;
             btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 Use GPS';
-        }
+            btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 }
+
+// ==================== ADDRESS SEARCH ====================
+function searchAddress() {
+    const query = document.getElementById('locationInput').value.trim();
+    const status = document.getElementById('locEnhanceStatus');
+    if (!query) { status.innerHTML = '<span style="color: var(--warning);">Enter an address to search</span>'; return; }
+
+    status.innerHTML = '<span style="color: var(--accent);"><i class="fas fa-search"></i> Searching...</span>';
+    fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`)
+        .then(r => r.json())
+        .then(results => {
+            if (results.length > 0) {
+                const r = results[0];
+                const lat = parseFloat(r.lat), lng = parseFloat(r.lon);
+                placeMarker(lat, lng);
+                document.getElementById('locationInput').value = r.display_name;
+                reportMap.setView([lat, lng], 16);
+                status.innerHTML = '<span style="color: var(--success);"><i class="fas fa-check-circle"></i> Location found & pinned on map!</span>';
+            } else {
+                status.innerHTML = '<span style="color: var(--warning);">No results. Try a more specific address.</span>';
+            }
+        })
+        .catch(() => {
+            status.innerHTML = '<span style="color: var(--danger);">Search failed. Check your connection.</span>';
+        });
+}
+// Allow Enter key in location input to trigger search
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('locationInput').addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') { e.preventDefault(); searchAddress(); }
+    });
+});
 </script>
+
 
             <!-- Priority Preview -->
             <div id="priorityPreview" style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: var(--radius-md); padding: 14px; margin-bottom: 20px; display: none;">

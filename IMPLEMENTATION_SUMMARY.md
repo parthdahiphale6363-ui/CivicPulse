@@ -25,7 +25,42 @@ Your CivicsPlus website has been completely transformed with:
 - 🎬 **Stagger Animation**: Sequential element animations
 - ⚙️ **Performance**: Debounce, throttle, lazy initialization
 
-### **3. Enhanced Homepage** (`index.html`)
+### 3. Library Stack
+### 1. Python Libraries (Backend & Security)
+- **`Flask`**: The central application framework.
+- **`Flask-WTF` & `CSRFProtect`**: The core security layer that prevents hackers from submitting forms on your behalf.
+- **`Flask-Limiter`**: Prevents "DDoS" or brute-force attacks by limiting request speeds.
+- **`SQLAlchemy`**: A safe way to talk to the database that prevents "SQL Injection" (one of the most common web hacks).
+- **`Werkzeug`**: Handles secure password hashing so even admins can't see your plain-text password.
+- **`Geopy` & `Sentence-Transformers`**: Used for "Semantic De-duplication" to ensure the system isn't spammed with identical reports.
+- **`Requests`**: Used to communicate securely with external AI services (Groq, Gemini).
+
+### 2. Frontend Libraries (Visuals & Animation)
+- **`Chart.js`**: Renders the beautiful, interactive data charts on the dashboard.
+- **`Lucide Icons`**: Provides the crisp, modern SVG icons used throughout the site.
+- **`Animate.css` & `GSAP` (concepts)**: While the site uses Vanilla JS for speed, it follows GSAP-inspired logic for smooth, GPU-accelerated motion.
+- **`Mapbox / Canvas`**: Used for rendering the real-time "Live City Pulse" radar.
+
+---
+
+## 🛡️ Safety & Security Architecture
+
+The platform was built with a "Security-First" mindset to protect both citizen privacy and government data.
+
+### 1. Identity Protection
+- **Phone/Email Verification**: No one can sign up with a fake identity. The system requires an OTP (One-Time Password) sent via **Twilio** or **SMTP** to verify the user is real.
+- **Role-Based Access Control (RBAC)**: The system strictly separates "Citizens" and "Administrators." You cannot access the Admin Dashboard without a verified administrative session token.
+
+### 2. Guarding Against Cyber Attacks
+- **CSRF Defense**: Every single form movement on the site (reporting, logging in, updating status) is protected by a hidden cryptographic token. This stops external malicious sites from "tricking" your browser into performing actions on CivicPulse.
+- **Rate Limiting**: To prevent bad actors from overloading the AI (which costs money/resources), the system limits voice-to-text and AI-report generation to a few times per minute per user.
+- **SQL Injection Prevention**: We never build database queries using raw text like `SELECT * FROM users WHERE name = '` + name + `'`. Instead, we use **Parameterized Queries** which safely "clean" the input before it touches the database.
+
+### 3. Content & Data Safety
+- **AI Content Filtering**: The system uses **Llama-3 Vision** to "look" at uploaded photos. If a user tries to upload something inappropriate or irrelevant (like a selfie or a meme), the AI automatically rejects the report.
+- **Data Encryption**: All sensitive environment variables (API Keys, Database Passwords) are stored in a `.env` file, which is never shared or made public, keeping the "keys to the castle" hidden.
+
+### **4. Enhanced Homepage** (`index.html`)
 - ✨ Animated hero section with rotating text and gradient effects
 - 🎆 3D stat cards with hover lift effects
 - 📦 Staggered department cards with gradient borders
@@ -34,7 +69,7 @@ Your CivicsPlus website has been completely transformed with:
 - 📊 Community impact section with reveal effects
 - 🔴 Call-to-action section with dynamic gradients
 
-### **4. Integration** (`base.html`)
+### **5. Integration** (`base.html`)
 - 📎 Added `animations.css` to stylesheet imports
 - 🔗 Added `advanced-animations.js` to script imports
 - ✅ All pages now have access to animations
