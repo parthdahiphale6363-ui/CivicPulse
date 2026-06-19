@@ -24,7 +24,6 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 from geopy.distance import geodesic
-from cv_utils import get_image_embedding, calculate_similarity
 
 # Load .env file if python-dotenv is available
 try:
