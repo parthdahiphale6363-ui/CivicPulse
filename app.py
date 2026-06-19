@@ -1289,7 +1289,7 @@ def send_otp():
     else:
         # Fallback for development if keys are missing
         print(f"DEBUG: OTP for {target} is {otp}. Error: {error_msg}")
-        return jsonify({"success": False, "message": f"Service error. Check .env if you used real keys. (Dev OTP: {otp})"})
+        return jsonify({"success": False, "message": f"Email Error: {error_msg} (Use Dev OTP: {otp})"})
 
 
 @app.route("/api/send-sms", methods=["POST"])
