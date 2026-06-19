@@ -80,7 +80,7 @@ def allowed_file(filename):
 
 # ---------------- EMAIL CONFIG ----------------
 MAIL_SERVER = "smtp.gmail.com"
-MAIL_PORT = 587
+MAIL_PORT = 465
 MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
 MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "") # Gmail App Password
 
@@ -127,8 +127,7 @@ def send_email_otp(target_email, otp_code):
         """
         msg.attach(MIMEText(body, 'html'))
         
-        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT)
-        server.starttls()
+        server = smtplib.SMTP_SSL(MAIL_SERVER, MAIL_PORT, timeout=10)
         server.login(MAIL_USERNAME, MAIL_PASSWORD)
         server.send_message(msg)
         server.quit()
