@@ -7,9 +7,7 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 #hotspotsMap { height: 400px; width: 100%; border-radius: var(--radius-sm); z-index: 1;}
-#healthHeatmap { height: 400px; width: 100%; border-radius: var(--radius-sm); z-index: 1;}
 </style>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -212,13 +210,6 @@
 
     <!-- Charts Grid -->
     <div class="dashboard-grid">
-        <div class="dash-card full-width reveal">
-            <div class="dash-card-header">
-                <h3><i class="fas fa-map-marked-alt" style="color: var(--warning);"></i> Civic Health Heatmap</h3>
-            </div>
-            <div id="healthHeatmap"></div>
-        </div>
-
         <div class="dash-card reveal">
             <div class="dash-card-header">
                 <h3><i class="fas fa-chart-pie" style="color: var(--primary-light);"></i> Priority Distribution</h3>
@@ -495,9 +486,7 @@ document.addEventListener('DOMContentLoaded', function() {
         attribution: '&copy; OpenStreetMap &copy; CARTO'
     }).addTo(hotspotsMapInstance);
 
-    // Health Heatmap
-    const healthMapInstance = L.map('healthHeatmap').setView([20.5937, 78.9629], 5);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(healthMapInstance);
+    
 
     fetch('/api/map-data')
     .then(r => r.json())
@@ -526,18 +515,6 @@ document.addEventListener('DOMContentLoaded', function() {
             marker.bindPopup(`<b>Predicted Hotspot</b><br>Confidence: ${p.probability}%<br>Category: ${p.category}`);
             predictMarkers.push(marker);
         });
-    });
-
-    // Fetch Heatmap Data
-    fetch('/api/city-twin/heatmap')
-    .then(r => r.json())
-    .then(data => {
-        L.heatLayer(data, {
-            radius: 25,
-            blur: 15,
-            maxZoom: 17,
-            gradient: {0.4: 'blue', 0.65: 'lime', 1: 'red'}
-        }).addTo(healthMapInstance);
     });
 
     fetchViralAlerts();

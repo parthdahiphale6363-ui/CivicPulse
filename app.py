@@ -45,9 +45,7 @@ limiter = Limiter(
 )
 
 
-from city_twin import city_twin_bp
 from civic_iq import civic_iq_bp
-app.register_blueprint(city_twin_bp)
 app.register_blueprint(civic_iq_bp)
 
 # ---------------- GLOBAL ERROR HANDLING ----------------
@@ -1568,15 +1566,17 @@ def dept_insight(category):
     data_summary = "\n".join([f"- Priority: {c['priority']}, Desc: {c['description']}" for c in complaints])
     
     prompt = f"""
-    You are a Senior Municipal Planning Expert. Analyzing the latest PENDING complaints for the '{category}' department:
+    You are an elite Senior Municipal Planning & Intelligence Expert in India. You are analyzing the latest PENDING complaints for the '{category}' department.
+    Data:
     {data_summary}
     
-    Provide a professional, actionable 3-point summary for the government staff:
-    1. Major Trending Issue: What is the biggest concern?
-    2. Recommended Staff Action: What step should be taken first?
-    3. Community Impact: How does this affect citizens?
+    Provide a highly accurate, advanced, and data-driven intelligence brief for government staff in exactly 4 sections:
+    1. Core Critical Bottleneck: Identify the deepest root cause from the data.
+    2. Hyper-Local Action Plan: Precise, immediate steps to resolve the backlog, including machinery/crew requirements in Indian context.
+    3. Citizen Impact & Escalation Risk: The real-world consequence if delayed further (health/safety risks).
+    4. Predictive Prevention Strategy: How to stop this from recurring next month.
     
-    Keep it professional, concise, and structured.
+    Maintain a strictly formal, executive-level tone. Do not use generic filler words.
     """
     
     insight = ask_groq(prompt, system_message="Official Government Strategic Advisor. Focus on efficiency and citizen satisfaction.")
@@ -1605,21 +1605,22 @@ def generate_weekly_report():
     cats_summary = ", ".join([f"{c['category']} ({c['count']})" for c in top_categories])
     
     prompt = f"""
-    You are a Municipal Commissioner's Executive Assistant. Generate a FORMAL weekly performance report based on this data:
+    You are the Chief Intelligence Officer for a major Indian Municipal Corporation. Generate an ADVANCED, highly accurate Weekly Strategic Performance Report based strictly on this raw data:
     
-    WEEKLY DATA:
+    WARD-WISE METRICS:
     {stats_summary}
     
-    TOP ISSUES:
+    DOMINANT INFRASTRUCTURE FAILURES:
     {cats_summary}
     
-    Provide the report in these sections:
-    1. Executive Overview (Professional summary)
-    2. Ward Performance Table (Mock up a textual table)
-    3. Primary Bottlenecks (Analyze why issues are pending)
-    4. Strategic Recommendations for Next Week
+    Provide the report in these specific, highly detailed sections:
+    1. Executive Intelligence Overview (High-level assessment of city operational health)
+    2. Ward Performance Matrix (A clean, textual data table showing resolution efficiency percentages)
+    3. Root Cause & Bottleneck Analysis (Why are specific wards or categories lagging?)
+    4. Resource Reallocation Directives (Actionable, realistic directives to shift budget or manpower next week)
+    5. Public Perception Risk (Analysis of how the current pending issues affect civic trust)
     
-    Keep the tone extremely professional and suitable for a City Council meeting.
+    Use advanced municipal governance terminology. Be highly analytical, factual, and strictly professional, suitable for a Commissioner's cabinet meeting.
     """
     
     report = ask_groq(prompt, system_message="Formal Municipal Reporting AI. Use institutional and administrative tone.")
@@ -1865,7 +1866,7 @@ def ai_analyze(id):
     if not complaint:
         return jsonify({"analysis": "Complaint not found."})
 
-    prompt = f"""Provide a detailed analysis of this municipal complaint:
+    prompt = f"""Provide a highly accurate and realistic analysis of this municipal complaint (suitable for Indian local government context):
 Category: {complaint['category']}
 Description: {complaint['description']}
 Current Priority: {complaint['priority']}
@@ -1877,7 +1878,7 @@ Provide:
 2. Impact on citizens
 3. Recommended priority adjustment (if any)
 4. Step-by-step resolution plan
-5. Preventive measures
+5. Preventive measures (include realistic cost estimates in ₹ INR if applicable)
 
 Keep it under 250 words."""
 
@@ -2062,8 +2063,8 @@ def api_ripple_effect(id):
     
     prompt = f"""
     Analyze this civic issue: {complaint['category']} - {complaint['description']}.
-    What are the cascading 'ripple effects' if this is ignored for a week? 
-    Give exactly 3 short points. Start Point 1 with 'Immediate:', Point 2 with 'Secondary:', Point 3 with 'Long-Term:'. Keep it brief and severely impactful.
+    What are the highly accurate, realistic cascading 'ripple effects' if this is ignored for a week in a dense Indian city? 
+    Give exactly 3 short points. Start Point 1 with 'Immediate:', Point 2 with 'Secondary:', Point 3 with 'Long-Term:'. Keep it brief, factual, and severely impactful. DO NOT add any intro or outro text.
     """
     
     try:
@@ -2089,12 +2090,12 @@ def api_resource_matrix(id):
         return jsonify({'error': 'Complaint not found'})
         
     prompt = f"""
-    Act as a Municipal Operations AI.
+    Act as a Municipal Operations AI in India.
     Analyze this repair job: {complaint['category']} - {complaint['description']}.
-    Provide a highly realistic 'Resource & Budget Matrix' in exactly these 3 lines:
-    1. Crew Required: [workers]
-    2. Equipment: [tools]
-    3. Estimated Cost: [$X, short reason]
+    Provide a highly accurate and realistic 'Operations Resource & Budget Blueprint' in exactly these 3 lines. DO NOT add any extra text:
+    1. Crew Required: [Realistic number and type of workers]
+    2. Equipment: [Realistic tools/machinery]
+    3. Estimated Cost: [₹X in INR, short reason for cost]
     """
     
     try:

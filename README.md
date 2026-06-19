@@ -14,7 +14,6 @@ Modern cities require modern solutions. Standard grievance portals are tedious a
 
 - **Zero-Friction Accessibility**: Features a Multilingual AI Voice Agent. Citizens can seamlessly narrate infrastructure problems in their native language without needing to type long forms.
 - **Autonomous Triaging**: Every issue logged is intercepted by AI. It generates structured descriptions, categorizes the department responsible, and flags the precise priority.
-- **Visual Intelligence**: Drops the standard boring grids for "LiveCity Twin"—a real-time geospatial radar with neon markers highlighting active civic tasks across the city scale.
 - **Strategic Action Engine**: Provides administrators with 3-point AI-generated "Action Plans" to resolve massive municipal blockages immediately upon reviewing them.
 - **Premium User Experience**: Powered by a custom-built 3D glassmorphic animation engine, featuring scroll-reveals, parallax tracking, and immersive visual responsiveness without bloated framework overhead.
 

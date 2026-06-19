@@ -104,15 +104,35 @@
 <script>
     document.addEventListener('DOMContentLoaded', () => {
         // Live Typing Effect
-        const typingTexts = [
-            "Analyzing city reports...",
-            "Monitoring infrastructure...",
+        const currentHour = new Date().getHours();
+        let greetingText = 'Good evening!';
+        if (currentHour < 12) greetingText = 'Good morning!';
+        else if (currentHour < 18) greetingText = 'Good afternoon!';
+
+        let typingTexts = [
+            greetingText,
+            "Loading live civic data...",
+            "Analyzing community reports...",
             "Ready to assist..."
         ];
         let typingIndex = 0;
         let charIndex = 0;
         let isDeleting = false;
         const typingElement = document.getElementById('aiTypingText');
+        const typingBubble = document.querySelector('.typing-bubble');
+        
+        // Feature: Clickable bubble to skip text
+        if (typingBubble) {
+            typingBubble.style.cursor = 'pointer';
+            typingBubble.title = 'Click to see next status';
+            typingBubble.style.transition = 'all 0.3s ease';
+            typingBubble.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (!isDeleting) {
+                    isDeleting = true;
+                }
+            });
+        }
         
         function typeEffect() {
             if (!typingElement) return;
@@ -154,13 +174,34 @@
                 const data = await response.json();
                 const total = data.total || 0;
                 const resolved = data.resolved || 0;
+                const pending = total - resolved;
                 const success = total ? Math.round((resolved / total) * 100) : 0;
+
+                // Feature: Dynamic text populated from real live data
+                typingTexts = [
+                    greetingText,
+                    `Tracking ${total} community reports`,
+                    `${pending} open issues need attention`,
+                    `${resolved} reports successfully resolved`,
+                    `${success}% community success rate`,
+                    `How can CivicAI assist you today?`
+                ];
 
                 if (heroTotalComplaints) {
                     heroTotalComplaints.textContent = total.toLocaleString();
                 }
                 if (heroSuccessRate) {
                     heroSuccessRate.textContent = `${success}%`;
+                }
+
+                // Feature: Pulse animation when live data refreshes
+                if (typingBubble) {
+                    typingBubble.style.transform = 'scale(1.05)';
+                    typingBubble.style.boxShadow = '0 10px 25px rgba(14, 165, 233, 0.4)';
+                    setTimeout(() => {
+                        typingBubble.style.transform = 'scale(1)';
+                        typingBubble.style.boxShadow = 'none';
+                    }, 600);
                 }
             } catch (error) {
                 console.error('Failed to update hero stats:', error);
