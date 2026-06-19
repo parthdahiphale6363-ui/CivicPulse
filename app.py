@@ -1925,8 +1925,11 @@ def register():
         )
         conn.commit()
         flash('Registration successful! Please login.', 'success')
-    except sqlite3.IntegrityError:
-        flash('Username already exists. Please choose a different one.', 'danger')
+    except Exception as e:
+        if "UNIQUE" in str(e) or "IntegrityError" in str(e):
+            flash('Username already exists. Please choose a different one.', 'danger')
+        else:
+            flash(f'Database error: {str(e)}', 'danger')
         conn.close()
         return redirect("/register")
 
