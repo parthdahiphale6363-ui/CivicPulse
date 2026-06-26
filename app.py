@@ -9,11 +9,8 @@ import io
 from datetime import datetime
 from functools import wraps
 import re
-import smtplib
 import random
 import string
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
 
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -24,6 +21,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 from geopy.distance import geodesic
+from cv_utils import get_image_embedding, calculate_similarity
 
 # Load .env file if python-dotenv is available
 try:
@@ -78,11 +76,9 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'avi'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# ---------------- EMAIL CONFIG ----------------
-MAIL_SERVER = "smtp.gmail.com"
-MAIL_PORT = 465
-MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "")
-MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "") # Gmail App Password
+# ---------------- EMAIL CONFIG (Resend HTTPS API) ----------------
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
+RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "CivicPulse <onboarding@resend.dev>").strip()
 
 # ---------------- TWILIO CONFIG ----------------
 TWILIO_SID = os.environ.get("TWILIO_SID", "")
@@ -108,40 +104,79 @@ def send_sms_otp(target_phone, otp_code):
 
 
 def send_email_otp(target_email, otp_code):
-    """Send a real OTP email via SMTP."""
-    if not MAIL_USERNAME or not MAIL_PASSWORD:
-        return False, "Email service not configured in .env"
-    
+    """Send a REAL OTP email using the Resend HTTPS API.
+
+    Uses RESEND_API_KEY for auth and RESEND_FROM_EMAIL as the sender.
+    Falls back gracefully with a clear error if either is missing.
+    """
+    if not RESEND_API_KEY:
+        app.logger.error("RESEND_API_KEY is not set — cannot send OTP email.")
+        return False, "Email service not configured (missing RESEND_API_KEY)"
+
+    sender = RESEND_FROM_EMAIL
+    if not sender:
+        app.logger.error("RESEND_FROM_EMAIL is not set — cannot send OTP email.")
+        return False, "Email service not configured (missing sender address)"
+
+    subject = f"Verification Code: {otp_code} — CivicPulse"
+    html_body = f"""
+    <h2>CivicPulse Verification</h2>
+    <p>Your verification code is: <strong style="font-size: 24px; color: #6366f1;">{otp_code}</strong></p>
+    <p>This code will expire in 10 minutes. Please enter it on the registration page to verify your account.</p>
+    <br>
+    <p>Team CivicPulse</p>
+    """.strip()
+
+    payload = {
+        "from": sender,
+        "to": [target_email],
+        "subject": subject,
+        "html": html_body,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {RESEND_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
     try:
-        msg = MIMEMultipart()
-        msg['From'] = MAIL_USERNAME
-        msg['To'] = target_email
-        msg['Subject'] = f"Verification Code: {otp_code} — CivicPulse"
-        
-        body = f"""
-        <h2>CivicPulse Verification</h2>
-        <p>Your verification code is: <strong style="font-size: 24px; color: #6366f1;">{otp_code}</strong></p>
-        <p>This code will expire in 10 minutes. Please enter it on the registration page to verify your account.</p>
-        <br>
-        <p>Team CivicPulse</p>
-        """
-        msg.attach(MIMEText(body, 'html'))
-        
-        server = smtplib.SMTP_SSL(MAIL_SERVER, MAIL_PORT, timeout=10)
-        server.login(MAIL_USERNAME, MAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
+        response = requests.post(
+            "https://api.resend.com/emails",
+            headers=headers,
+            json=payload,
+            timeout=20,
+        )
+
+        if response.status_code >= 400:
+            app.logger.error(
+                f"OTP email send failed for {target_email}: HTTP {response.status_code} - {response.text}"
+            )
+            return False, f"Resend API error: HTTP {response.status_code}"
+
+        app.logger.info(f"OTP email sent successfully to {target_email}")
         return True, "Success"
+
+    except requests.exceptions.Timeout:
+        app.logger.error(f"OTP email send timed out for {target_email}")
+        return False, "Email service timed out"
+
+    except requests.exceptions.ConnectionError as e:
+        app.logger.error(f"OTP email connection error for {target_email}: {e}")
+        return False, "Could not connect to email service"
+
     except Exception as e:
-        return False, str(e)
+        app.logger.error(
+            f"OTP email send failed for {target_email}: {type(e).__name__}: {e}"
+        )
+        return False, f"Resend request failed: {type(e).__name__}"
 
 
 # ---------------- GROQ AI CONFIG ----------------
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-def ask_groq(prompt, system_message="You are a helpful assistant for a local government problem reporting system. Be concise and helpful."):
-    """Send a prompt to Groq AI and return the response."""
+def ask_groq(prompt, system_message="You are a helpful assistant."):
+    """Send a prompt to Groq AI and return the response text."""
     if not GROQ_API_KEY:
         return "AI service not configured. Please set GROQ_API_KEY environment variable."
     try:
