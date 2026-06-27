@@ -300,7 +300,7 @@ def inject_csrf_token(response):
 
 # ---------------- DATABASE CONNECTION ----------------
 DB_PATH = os.path.join(DATA_DIR, "database.db")
-_db_url = os.environ.get('DATABASE_URL', f'sqlite:///{DB_PATH}')
+_db_url = os.environ.get('DATABASE_URL', f'sqlite:///{DB_PATH}').strip()
 # SQLAlchemy 1.4+ dropped support for the "postgres://" prefix — fix it
 if _db_url.startswith("postgres://"):
     _db_url = _db_url.replace("postgres://", "postgresql+psycopg2://", 1)
@@ -376,7 +376,7 @@ def get_db_connection():
 # ---------------- CREATE TABLES ----------------
 def create_table():
     conn = get_db_connection()
-    is_postgres = _db_url.startswith("postgresql")
+    is_postgres = "postgres" in _db_url.lower()
 
     def pk_col():
         return "SERIAL PRIMARY KEY" if is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
