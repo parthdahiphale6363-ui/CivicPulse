@@ -76,48 +76,20 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'avi'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# ---------------- EMAIL CONFIG (Resend HTTPS API) ----------------
-RESEND_API_KEY = os.environ.get("RESEND_API_KEY", "").strip()
-RESEND_FROM_EMAIL = os.environ.get("RESEND_FROM_EMAIL", "CivicPulse <onboarding@resend.dev>").strip()
-
-# ---------------- TWILIO CONFIG ----------------
-TWILIO_SID = os.environ.get("TWILIO_SID", "")
-TWILIO_TOKEN = os.environ.get("TWILIO_TOKEN", "")
-TWILIO_NUMBER = os.environ.get("TWILIO_NUMBER", "")
-
-def send_sms_otp(target_phone, otp_code):
-    """Send a real SMS OTP via Twilio."""
-    if not TWILIO_SID or not TWILIO_TOKEN or not TWILIO_NUMBER:
-        return False, "Twilio not configured in .env"
-    
-    try:
-        from twilio.rest import Client
-        client = Client(TWILIO_SID, TWILIO_TOKEN)
-        message = client.messages.create(
-            body=f"Your CivicPulse verification code is: {otp_code}",
-            from_=TWILIO_NUMBER,
-            to=f"+91{target_phone}" if len(target_phone) == 10 else target_phone
-        )
-        return True, "Success"
-    except Exception as e:
-        return False, str(e)
-
+# ---------------- EMAIL CONFIG (SMTP / GMAIL) ----------------
+MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
+MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
+MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "").strip()
+MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "").strip()
+MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", MAIL_USERNAME).strip()
 
 def send_email_otp(target_email, otp_code):
-    """Send a REAL OTP email using the Resend HTTPS API.
+    """Send a REAL OTP email using standard SMTP (e.g., Gmail)."""
+    if not MAIL_USERNAME or not MAIL_PASSWORD:
+        app.logger.error("MAIL_USERNAME or MAIL_PASSWORD is not set — cannot send OTP email.")
+        return False, "Email credentials (MAIL_USERNAME/MAIL_PASSWORD) not configured."
 
-    Uses RESEND_API_KEY for auth and RESEND_FROM_EMAIL as the sender.
-    Falls back gracefully with a clear error if either is missing.
-    """
-    if not RESEND_API_KEY:
-        app.logger.error("RESEND_API_KEY is not set — cannot send OTP email.")
-        return False, "Email service not configured (missing RESEND_API_KEY)"
-
-    sender = RESEND_FROM_EMAIL
-    if not sender:
-        app.logger.error("RESEND_FROM_EMAIL is not set — cannot send OTP email.")
-        return False, "Email service not configured (missing sender address)"
-
+    sender = MAIL_DEFAULT_SENDER or MAIL_USERNAME
     subject = f"Verification Code: {otp_code} — CivicPulse"
     html_body = f"""
     <h2>CivicPulse Verification</h2>
@@ -127,53 +99,30 @@ def send_email_otp(target_email, otp_code):
     <p>Team CivicPulse</p>
     """.strip()
 
-    payload = {
-        "from": sender,
-        "to": [target_email],
-        "subject": subject,
-        "html": html_body,
-    }
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+    import smtplib
 
-    headers = {
-        "Authorization": f"Bearer {RESEND_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    msg = MIMEMultipart()
+    msg['From'] = f"CivicPulse <{sender}>"
+    msg['To'] = target_email
+    msg['Subject'] = subject
+    msg.attach(MIMEText(html_body, 'html'))
 
     try:
-        response = requests.post(
-            "https://api.resend.com/emails",
-            headers=headers,
-            json=payload,
-            timeout=20,
-        )
-
-        if response.status_code >= 400:
-            if response.status_code == 403:
-                app.logger.warning(
-                    f"OTP email skipped for {target_email} (Resend Free Tier restricts recipients). Falling back to Dev Mode."
-                )
-            else:
-                app.logger.error(
-                    f"OTP email send failed for {target_email}: HTTP {response.status_code} - {response.text}"
-                )
-            return False, f"Resend API error: HTTP {response.status_code}"
-
-        app.logger.info(f"OTP email sent successfully to {target_email}")
+        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT, timeout=10)
+        server.starttls()
+        server.login(MAIL_USERNAME, MAIL_PASSWORD)
+        server.send_message(msg)
+        server.quit()
+        app.logger.info(f"OTP email sent successfully to {target_email} via SMTP.")
         return True, "Success"
-
-    except requests.exceptions.Timeout:
-        app.logger.error(f"OTP email send timed out for {target_email}")
-        return False, "Email service timed out"
-
-    except requests.exceptions.ConnectionError as e:
-        app.logger.error(f"OTP email connection error for {target_email}: {e}")
-        return False, "Could not connect to email service"
-
+    except smtplib.SMTPAuthenticationError:
+        app.logger.error(f"OTP email auth failed for {MAIL_USERNAME}. Invalid App Password?")
+        return False, "SMTP Authentication failed. Check your App Password."
     except Exception as e:
-        app.logger.error(
-            f"OTP email send failed for {target_email}: {type(e).__name__}: {e}"
-        )
-        return False, f"Resend request failed: {type(e).__name__}"
+        app.logger.error(f"OTP email send failed for {target_email}: {type(e).__name__}: {e}")
+        return False, f"SMTP request failed: {type(e).__name__}"
 
 
 # ---------------- GROQ AI CONFIG ----------------
@@ -1327,9 +1276,8 @@ def send_otp():
     if success:
         return jsonify({"success": True, "message": "OTP sent! Check your inbox (and spam folder)"})
     else:
-        # Fallback for development if keys are missing or Resend API returns 403 (unverified domain)
-        print(f"DEBUG: OTP for {target} is {otp}. Error: {error_msg}")
-        return jsonify({"success": True, "message": f"Dev Mode (Email failed): Use OTP {otp}"})
+        app.logger.error(f"OTP email failed for {target}. Error: {error_msg}")
+        return jsonify({"success": False, "message": f"Email Error: {error_msg}"})
 
 
 @app.route("/api/send-sms", methods=["POST"])
