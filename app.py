@@ -300,7 +300,13 @@ def inject_csrf_token(response):
 
 # ---------------- DATABASE CONNECTION ----------------
 DB_PATH = os.path.join(DATA_DIR, "database.db")
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', f'sqlite:///{DB_PATH}')
+_db_url = os.environ.get('DATABASE_URL', f'sqlite:///{DB_PATH}')
+# SQLAlchemy 1.4+ dropped support for the "postgres://" prefix — fix it
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+elif _db_url.startswith("postgresql://"):
+    _db_url = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
