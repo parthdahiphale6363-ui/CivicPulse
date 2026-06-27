@@ -4,9 +4,14 @@ import numpy as np
 from PIL import Image
 from sentence_transformers import SentenceTransformer, util
 
-# Load the model only once at startup
-# 'clip-ViT-B-32' is fast and relatively lightweight (~600MB)
-cv_model = SentenceTransformer('clip-ViT-B-32')
+# Load the model lazily to save memory on startup
+cv_model = None
+
+def get_cv_model():
+    global cv_model
+    if cv_model is None:
+        cv_model = SentenceTransformer('clip-ViT-B-32')
+    return cv_model
 
 def get_image_embedding(image_path_or_bytes):
     """Generates a semantic embedding vector for a given image."""
@@ -20,7 +25,7 @@ def get_image_embedding(image_path_or_bytes):
         if img.mode != 'RGB':
             img = img.convert('RGB')
             
-        embedding = cv_model.encode(img, convert_to_tensor=True)
+        embedding = get_cv_model().encode(img, convert_to_tensor=True)
         return embedding.cpu().numpy().tobytes() # Return bytes for SQLite BLOB
     except Exception as e:
         print(f"Error generating embedding: {e}")
