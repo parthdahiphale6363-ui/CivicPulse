@@ -79,8 +79,8 @@ def allowed_file(filename):
 # ---------------- EMAIL CONFIG (SMTP / GMAIL) ----------------
 MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
 MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
-MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "").strip()
-MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "").strip()
+MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "parthdahiphale6363@gmail.com").strip()
+MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "hpadmvbkvkqjdnww").strip()
 MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", MAIL_USERNAME).strip()
 
 def send_email_otp(target_email, otp_code):
