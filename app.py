@@ -376,8 +376,14 @@ def get_db_connection():
 # ---------------- CREATE TABLES ----------------
 def create_table():
     conn = get_db_connection()
+    is_postgres = _db_url.startswith("postgresql")
 
-    conn.execute("""
+    def pk_col():
+        return "SERIAL PRIMARY KEY" if is_postgres else "INTEGER PRIMARY KEY AUTOINCREMENT"
+    def blob_type():
+        return "BYTEA" if is_postgres else "BLOB"
+
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS workers (
             name TEXT PRIMARY KEY,
             lat REAL,
@@ -387,9 +393,9 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS complaints (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             category TEXT,
             description TEXT,
             priority TEXT,
@@ -409,9 +415,9 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             fullname TEXT,
             mobile TEXT,
             email TEXT,
@@ -422,9 +428,9 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS chat_history (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             user_id INTEGER DEFAULT 0,
             message TEXT,
             response TEXT,
@@ -432,9 +438,9 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS announcements (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             title TEXT,
             content TEXT,
             author TEXT DEFAULT 'Admin',
@@ -442,9 +448,9 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS feedback (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             complaint_id INTEGER,
             user_id INTEGER DEFAULT 0,
             rating INTEGER DEFAULT 5,
@@ -453,21 +459,19 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS complaint_subscribers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             complaint_id INTEGER,
             user_id INTEGER,
             created_at TEXT,
-            FOREIGN KEY(complaint_id) REFERENCES complaints(id),
-            FOREIGN KEY(user_id) REFERENCES users(id),
             UNIQUE(complaint_id, user_id)
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS comments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             complaint_id INTEGER,
             user_id INTEGER,
             parent_id INTEGER DEFAULT NULL,
@@ -476,9 +480,9 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS issue_affected (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             complaint_id INTEGER,
             user_id INTEGER,
             created_at TEXT,
@@ -486,9 +490,9 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS issue_timeline (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             complaint_id INTEGER,
             status TEXT,
             notes TEXT,
@@ -496,17 +500,17 @@ def create_table():
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS weekly_summaries (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             summary TEXT,
             created_at TEXT
         )
     """)
 
-    conn.execute("""
+    conn.execute(f"""
         CREATE TABLE IF NOT EXISTS user_badges (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id {pk_col()},
             user_id INTEGER,
             badge_name TEXT,
             awarded_at TEXT,
@@ -514,7 +518,7 @@ def create_table():
         )
     """)
 
-    # Migration: add columns if missing
+    # Migration: add columns if missing (PostgreSQL-compatible)
     migrations = [
         ("complaints", "location", "TEXT DEFAULT ''"),
         ("complaints", "created_at", "TEXT"),
@@ -529,7 +533,7 @@ def create_table():
         ("complaints", "user_id", "INTEGER DEFAULT 0"),
         ("complaints", "latitude", "REAL DEFAULT NULL"),
         ("complaints", "longitude", "REAL DEFAULT NULL"),
-        ("complaints", "image_embedding", "BLOB DEFAULT NULL"),
+        ("complaints", "image_embedding", f"{blob_type()} DEFAULT NULL"),
         ("complaints", "department", "TEXT DEFAULT 'General'"),
         ("complaints", "estimated_resolution_time", "TEXT DEFAULT ''"),
         ("complaints", "resolution_confidence", "INTEGER DEFAULT 0"),
@@ -544,12 +548,24 @@ def create_table():
     ]
     for table, column, col_type in migrations:
         try:
-            conn.execute(f"SELECT {column} FROM {table} LIMIT 1")
+            if is_postgres:
+                exists = conn.execute(
+                    "SELECT 1 FROM information_schema.columns WHERE table_name=? AND column_name=?",
+                    (table, column)
+                ).fetchone()
+                if not exists:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            else:
+                conn.execute(f"SELECT {column} FROM {table} LIMIT 1")
         except:
-            conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            try:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {col_type}")
+            except:
+                pass
 
     conn.commit()
     conn.close()
+
 with app.app_context():
     create_table()
 
