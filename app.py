@@ -148,9 +148,14 @@ def send_email_otp(target_email, otp_code):
         )
 
         if response.status_code >= 400:
-            app.logger.error(
-                f"OTP email send failed for {target_email}: HTTP {response.status_code} - {response.text}"
-            )
+            if response.status_code == 403:
+                app.logger.warning(
+                    f"OTP email skipped for {target_email} (Resend Free Tier restricts recipients). Falling back to Dev Mode."
+                )
+            else:
+                app.logger.error(
+                    f"OTP email send failed for {target_email}: HTTP {response.status_code} - {response.text}"
+                )
             return False, f"Resend API error: HTTP {response.status_code}"
 
         app.logger.info(f"OTP email sent successfully to {target_email}")
