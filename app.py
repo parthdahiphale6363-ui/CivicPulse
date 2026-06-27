@@ -76,20 +76,16 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'mp4', 'mov', 'avi'}
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# ---------------- EMAIL CONFIG (SMTP / GMAIL) ----------------
-MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
-MAIL_PORT = int(os.environ.get("MAIL_PORT", 587))
-MAIL_USERNAME = os.environ.get("MAIL_USERNAME", "parthdahiphale6363@gmail.com").strip()
-MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "hpadmvbkvkqjdnww").strip()
-MAIL_DEFAULT_SENDER = os.environ.get("MAIL_DEFAULT_SENDER", MAIL_USERNAME).strip()
+# ---------------- EMAIL CONFIG (Brevo HTTP API) ----------------
+BREVO_API_KEY = os.environ.get("BREVO_API_KEY", "").strip()
+SENDER_EMAIL = "parthdahiphale6363@gmail.com"
 
 def send_email_otp(target_email, otp_code):
-    """Send a REAL OTP email using standard SMTP (e.g., Gmail)."""
-    if not MAIL_USERNAME or not MAIL_PASSWORD:
-        app.logger.error("MAIL_USERNAME or MAIL_PASSWORD is not set — cannot send OTP email.")
-        return False, "Email credentials (MAIL_USERNAME/MAIL_PASSWORD) not configured."
+    """Send a REAL OTP email using Brevo HTTP API (bypasses Render SMTP blocks)."""
+    if not BREVO_API_KEY:
+        app.logger.error("BREVO_API_KEY is not set — cannot send OTP email.")
+        return False, "Email service not configured."
 
-    sender = MAIL_DEFAULT_SENDER or MAIL_USERNAME
     subject = f"Verification Code: {otp_code} — CivicPulse"
     html_body = f"""
     <h2>CivicPulse Verification</h2>
@@ -99,30 +95,37 @@ def send_email_otp(target_email, otp_code):
     <p>Team CivicPulse</p>
     """.strip()
 
-    from email.mime.text import MIMEText
-    from email.mime.multipart import MIMEMultipart
-    import smtplib
+    headers = {
+        "api-key": BREVO_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+    }
 
-    msg = MIMEMultipart()
-    msg['From'] = f"CivicPulse <{sender}>"
-    msg['To'] = target_email
-    msg['Subject'] = subject
-    msg.attach(MIMEText(html_body, 'html'))
+    payload = {
+        "sender": {"name": "CivicPulse", "email": SENDER_EMAIL},
+        "to": [{"email": target_email}],
+        "subject": subject,
+        "htmlContent": html_body
+    }
 
     try:
-        server = smtplib.SMTP(MAIL_SERVER, MAIL_PORT, timeout=10)
-        server.starttls()
-        server.login(MAIL_USERNAME, MAIL_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        app.logger.info(f"OTP email sent successfully to {target_email} via SMTP.")
+        response = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers=headers,
+            json=payload,
+            timeout=20
+        )
+        
+        if response.status_code >= 400:
+            app.logger.error(f"OTP email send failed for {target_email}: HTTP {response.status_code} - {response.text}")
+            return False, f"Brevo API error: HTTP {response.status_code}"
+
+        app.logger.info(f"OTP email sent successfully to {target_email} via Brevo.")
         return True, "Success"
-    except smtplib.SMTPAuthenticationError:
-        app.logger.error(f"OTP email auth failed for {MAIL_USERNAME}. Invalid App Password?")
-        return False, "SMTP Authentication failed. Check your App Password."
+
     except Exception as e:
         app.logger.error(f"OTP email send failed for {target_email}: {type(e).__name__}: {e}")
-        return False, f"SMTP request failed: {type(e).__name__}"
+        return False, f"Brevo request failed: {type(e).__name__}"
 
 
 # ---------------- GROQ AI CONFIG ----------------
