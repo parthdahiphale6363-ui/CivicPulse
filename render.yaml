@@ -11,3 +11,7 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.10.12
+      - key: MAIL_USERNAME
+        value: parthdahiphale6363@gmail.com
+      - key: MAIL_PASSWORD
+        value: hpadmvbkvkqjdnww
