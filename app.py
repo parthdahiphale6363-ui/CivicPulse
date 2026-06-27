@@ -1320,11 +1320,11 @@ def send_otp():
     success, error_msg = send_email_otp(target, otp)
     
     if success:
-        return jsonify({"success": True, "message": "OTP sent successfully!"})
+        return jsonify({"success": True, "message": "OTP sent! Check your inbox (and spam folder)"})
     else:
-        # Fallback for development if keys are missing
+        # Fallback for development if keys are missing or Resend API returns 403 (unverified domain)
         print(f"DEBUG: OTP for {target} is {otp}. Error: {error_msg}")
-        return jsonify({"success": False, "message": f"Email Error: {error_msg} (Use Dev OTP: {otp})"})
+        return jsonify({"success": True, "message": f"Dev Mode (Email failed): Use OTP {otp}"})
 
 
 @app.route("/api/send-sms", methods=["POST"])

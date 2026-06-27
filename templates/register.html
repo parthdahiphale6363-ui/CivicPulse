@@ -461,7 +461,7 @@ function sendOtpToEmail() {
             sendBtn.style.background = 'rgba(34, 197, 94, 0.1)';
             sendBtn.style.borderColor = 'var(--success)';
             sendBtn.style.color = 'var(--success)';
-            emailMsg.innerHTML = '<span class="msg-success"><i class="fas fa-check-circle"></i> OTP sent! Check your inbox (and spam folder)</span>';
+            emailMsg.innerHTML = '<span class="msg-success"><i class="fas fa-check-circle"></i> ' + (data.message || 'OTP sent! Check your inbox (and spam folder)') + '</span>';
             emailInput.readOnly = true;
             
             // Start resend countdown
