@@ -836,7 +836,10 @@ Keep it under 150 words."""
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
         (category, description, priority, status, location, created_at, ai_analysis, ai_suggestion, image_url, video_url, is_emergency, session.get('user_id', 0), latitude, longitude, new_embedding_bytes, ward, is_anonymous)
     )
-    complaint_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+    if "postgres" in _db_url.lower():
+        complaint_id = conn.execute("SELECT LASTVAL()").fetchone()[0]
+    else:
+        complaint_id = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
     
     # Initialize timeline
     conn.execute(
