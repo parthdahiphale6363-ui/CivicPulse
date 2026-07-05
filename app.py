@@ -1766,10 +1766,19 @@ def community():
         "SELECT c.*, (SELECT COUNT(*) FROM comments WHERE complaint_id = c.id) as comment_count FROM complaints c ORDER BY c.upvotes DESC LIMIT 10"
     ).fetchall()
 
+    is_postgres = "postgres" in _db_url.lower()
+
+    if is_postgres:
+        resolved_days_expr = "EXTRACT(EPOCH FROM (CAST(c.resolved_at AS TIMESTAMP) - CAST(c.created_at AS TIMESTAMP))) / 86400.0"
+        avg_days_expr = "AVG(EXTRACT(EPOCH FROM (CAST(resolved_at AS TIMESTAMP) - CAST(created_at AS TIMESTAMP))) / 86400.0)"
+    else:
+        resolved_days_expr = "(julianday(c.resolved_at) - julianday(c.created_at))"
+        avg_days_expr = "AVG(julianday(resolved_at) - julianday(created_at))"
+
     # Resolved Issue Celebration Feed
-    resolved_feed = conn.execute("""
+    resolved_feed = conn.execute(f"""
         SELECT c.*, u.fullname,
-               (julianday(c.resolved_at) - julianday(c.created_at)) as resolution_days
+               {resolved_days_expr} as resolution_days
         FROM complaints c
         LEFT JOIN users u ON c.user_id = u.id
         WHERE c.status='Resolved'
@@ -1777,9 +1786,9 @@ def community():
     """).fetchall()
 
     # Department Response Leaderboard
-    dept_leaderboard = conn.execute("""
+    dept_leaderboard = conn.execute(f"""
         SELECT department, COUNT(*) as resolved_count, 
-               AVG(julianday(resolved_at) - julianday(created_at)) as avg_days
+               {avg_days_expr} as avg_days
         FROM complaints 
         WHERE status='Resolved' AND department != 'General'
         GROUP BY department
