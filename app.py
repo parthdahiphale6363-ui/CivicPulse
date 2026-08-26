@@ -770,7 +770,12 @@ Return ONLY JSON."""
                     cleaned_ans = vision_ans.replace('```json', '').replace('```', '').strip()
                     vision_data = json.loads(cleaned_ans)
                     
-                    if not vision_data.get("is_valid", True):
+                    # Handle is_valid as both boolean and string (AI may return "true"/"false")
+                    is_valid = vision_data.get("is_valid", True)
+                    if isinstance(is_valid, str):
+                        is_valid = is_valid.lower().strip() in ("true", "1", "yes")
+                    
+                    if not is_valid:
                         flash(f"AI Image Validation Failed: {vision_data.get('reason', 'Irrelevant image detected.')}", "danger")
                         return redirect("/report")
                         
