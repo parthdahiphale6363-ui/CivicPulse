@@ -146,7 +146,7 @@ def ask_groq(prompt, system_message="You are a helpful assistant."):
             "Content-Type": "application/json"
         }
         data = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "qwen/qwen3.8-27b",
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": prompt}
@@ -243,7 +243,7 @@ def ask_groq_vision(base64_image, prompt="Analyze this image."):
             "Content-Type": "application/json"
         }
         data = {
-            "model": "llama-3.2-11b-vision-preview",
+            "model": "qwen/qwen3.8-27b",
             "messages": [
                 {
                     "role": "user",

@@ -19,7 +19,7 @@ def ask_groq(prompt, system_message="You are a senior civic intelligence officer
             "Content-Type": "application/json"
         }
         payload = {
-            "model": "llama-3.3-70b-versatile",
+            "model": "qwen/qwen3.8-27b",
             "messages": [
                 {"role": "system", "content": system_message},
                 {"role": "user", "content": prompt}
