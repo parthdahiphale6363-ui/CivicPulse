@@ -10,6 +10,13 @@ civic_iq_bp = Blueprint('civic_iq', __name__, template_folder='templates')
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
+def strip_think_tags(text):
+    """Strip <think>...</think> reasoning blocks that Qwen models add to responses."""
+    if not text:
+        return text
+    cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
+    return cleaned if cleaned else text
+
 def ask_groq(prompt, system_message="You are a senior civic intelligence officer in India.", temperature=0.5):
     if not GROQ_API_KEY:
         return None
@@ -30,7 +37,8 @@ def ask_groq(prompt, system_message="You are a senior civic intelligence officer
         }
         res = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
         res.raise_for_status()
-        return res.json()["choices"][0]["message"]["content"]
+        raw = res.json()["choices"][0]["message"]["content"]
+        return strip_think_tags(raw)
     except Exception as e:
         print(f"CivicIQ AI Error: {e}")
         return None
