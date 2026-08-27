@@ -1259,32 +1259,148 @@ Do NOT use markdown. Only JSON."""
 
 @app.route("/api/nearby-duplicates", methods=["POST"])
 def nearby_duplicates():
-    """Find and return existing similar complaints nearby."""
+    """Semantic duplicate detection: finds nearby complaints that may describe the same issue."""
     data = request.get_json()
     lat = data.get("latitude")
     lng = data.get("longitude")
+    new_category = data.get("category", "").strip()
+    new_description = data.get("description", "").strip()
+    
     if lat is None or lng is None:
+        return jsonify([])
+    
+    try:
+        lat = float(lat)
+        lng = float(lng)
+    except (ValueError, TypeError):
         return jsonify([])
         
     conn = get_db_connection()
-    recent = conn.execute("SELECT id, category, description, location, latitude, longitude, status FROM complaints WHERE status != 'Resolved'").fetchall()
+    recent = conn.execute(
+        "SELECT id, category, description, location, latitude, longitude, status FROM complaints WHERE status != 'Resolved' AND latitude IS NOT NULL AND longitude IS NOT NULL"
+    ).fetchall()
     conn.close()
     
-    similar = []
+    # Phase 1: Geographic filter — find all complaints within 500m
+    nearby = []
     new_coords = (lat, lng)
     for c in recent:
-        if c['latitude'] and c['longitude']:
-            dist = geodesic(new_coords, (c['latitude'], c['longitude'])).meters
-            if dist <= 200: # within 200 meters Show them to user
-                similar.append({
-                    "id": c['id'],
-                    "category": c['category'],
-                    "location": c['location'],
-                    "distance_m": int(dist),
-                    "status": c['status']
-                })
-    similar = sorted(similar, key=lambda x: x['distance_m'])[:3]
-    return jsonify(similar)
+        try:
+            if c['latitude'] and c['longitude']:
+                dist = geodesic(new_coords, (float(c['latitude']), float(c['longitude']))).meters
+                if dist <= 500:
+                    nearby.append({
+                        "id": c['id'],
+                        "category": c['category'],
+                        "description": c['description'] or "",
+                        "location": c['location'],
+                        "distance_m": int(dist),
+                        "status": c['status']
+                    })
+        except Exception:
+            continue
+    
+    if not nearby:
+        return jsonify([])
+    
+    # Phase 2: Score each nearby complaint
+    results = []
+    for c in nearby:
+        score = 0
+        
+        # Distance scoring: closer = higher score (max 30 pts)
+        if c['distance_m'] <= 50:
+            score += 30
+        elif c['distance_m'] <= 150:
+            score += 20
+        elif c['distance_m'] <= 300:
+            score += 10
+        else:
+            score += 5
+        
+        # Category match bonus (max 25 pts)
+        if new_category and c['category'] == new_category:
+            score += 25
+        
+        # Text similarity via simple keyword overlap (max 25 pts) — fast, no API call
+        if new_description and c['description']:
+            new_words = set(new_description.lower().split())
+            old_words = set(c['description'].lower().split())
+            # Remove common stopwords
+            stopwords = {'the','a','an','is','are','was','were','in','on','at','to','for','of','and','or','it','this','that','there','has','have','had','i','my','we','our','with','from','by'}
+            new_words -= stopwords
+            old_words -= stopwords
+            if new_words and old_words:
+                overlap = len(new_words & old_words)
+                union_size = len(new_words | old_words)
+                jaccard = overlap / union_size if union_size > 0 else 0
+                score += int(jaccard * 25)
+        
+        c['match_score'] = min(score, 100)
+        c['description_preview'] = (c['description'][:120] + '...') if len(c['description']) > 120 else c['description']
+        results.append(c)
+    
+    # Phase 3: For the top candidates with score >= 40, use AI for semantic verification
+    results.sort(key=lambda x: x['match_score'], reverse=True)
+    top_candidates = [r for r in results if r['match_score'] >= 40][:3]
+    
+    if top_candidates and new_description:
+        # Batch AI call for efficiency: check all candidates at once
+        complaints_text = ""
+        for i, c in enumerate(top_candidates):
+            complaints_text += f"\n  Complaint #{c['id']} (Category: {c['category']}, {c['distance_m']}m away): \"{c['description'][:200]}\""
+        
+        ai_prompt = f"""You are a semantic deduplication engine for civic complaints.
+A citizen is about to file: Category="{new_category}", Description="{new_description[:300]}"
+
+Existing nearby complaints:{complaints_text}
+
+For each existing complaint, determine if it describes the SAME real-world physical issue.
+Return ONLY a JSON array like: [{{"id": 123, "is_same_issue": true, "confidence": 0.85}}]
+Rules:
+- is_same_issue=true ONLY if they clearly describe the same specific problem at the same place
+- Two potholes 300m apart are NOT the same issue
+- "Road damage near market" and "Big hole on market road" ARE likely the same issue
+Return ONLY valid JSON array, no markdown."""
+
+        try:
+            raw = ask_groq(ai_prompt, "You are a deduplication engine. Return only JSON.")
+            if raw:
+                clean = raw.strip()
+                if "```json" in clean: clean = clean.split("```json")[1].split("```")[0]
+                if "```" in clean: clean = clean.split("```")[0]
+                ai_results = json.loads(clean.strip())
+                
+                # Merge AI scores into results
+                ai_map = {item['id']: item for item in ai_results if isinstance(item, dict)}
+                for r in top_candidates:
+                    ai_data = ai_map.get(r['id'])
+                    if ai_data:
+                        if ai_data.get('is_same_issue') and ai_data.get('confidence', 0) > 0.6:
+                            # Boost score significantly
+                            r['match_score'] = min(100, r['match_score'] + int(ai_data['confidence'] * 40))
+                        elif not ai_data.get('is_same_issue') and ai_data.get('confidence', 0) > 0.7:
+                            # AI says NOT same issue — reduce score
+                            r['match_score'] = max(10, r['match_score'] - 20)
+        except Exception as e:
+            print(f"AI semantic duplicate check error: {e}")
+    
+    # Return top 5 results sorted by match score, only those with score >= 20
+    results.sort(key=lambda x: x['match_score'], reverse=True)
+    final = []
+    for r in results[:5]:
+        if r['match_score'] >= 20:
+            final.append({
+                "id": r['id'],
+                "category": r['category'],
+                "location": r['location'],
+                "distance_m": r['distance_m'],
+                "status": r['status'],
+                "match_score": r['match_score'],
+                "description_preview": r['description_preview']
+            })
+    
+    return jsonify(final)
 
 
 # ---------------- COMPLAINTS ----------------

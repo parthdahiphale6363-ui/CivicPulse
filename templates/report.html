@@ -723,28 +723,59 @@ function enhanceLocation() {
     });
 }
 
+let _dupDebounceTimer = null;
+
 function checkDuplicates(lat, lon) {
     if (!lat || !lon) return;
-    fetch('/api/nearby-duplicates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latitude: lat, longitude: lon })
-    }).then(res => res.json()).then(data => {
+    
+    // Debounce: wait 600ms after the last call before actually querying
+    clearTimeout(_dupDebounceTimer);
+    _dupDebounceTimer = setTimeout(() => {
+        const category = document.getElementById('categorySelect') ? document.getElementById('categorySelect').value : '';
+        const description = document.getElementById('descriptionInput') ? document.getElementById('descriptionInput').value.trim() : '';
+        
         const dupDiv = document.getElementById('duplicateWarning');
-        if (data.length > 0) {
-            dupDiv.style.display = 'block';
-            let html = '<h5 style="margin-bottom: 8px; color: var(--warning);"><i class="fas fa-copy"></i> Similar Reports Nearby</h5>';
-            html += '<p style="margin-bottom: 8px; font-size: 13px;">Consider upvoting instead of creating a duplicate to boost urgency!</p>';
-            html += '<ul style="padding-left: 20px; font-size: 13px; margin-bottom: 0;">';
-            data.forEach(d => {
-                html += `<li style="margin-bottom: 4px;"><a href="/complaint/${d.id}" target="_blank" style="color: var(--info); text-decoration: underline;">#${d.id} - ${d.category}</a> (${d.distance_m}m away - ${d.status})</li>`;
-            });
-            html += '</ul>';
-            dupDiv.innerHTML = html;
-        } else {
+        dupDiv.style.display = 'block';
+        dupDiv.innerHTML = '<span style="color: var(--info); font-size: 12px;"><i class="fas fa-spinner fa-spin"></i> Scanning for similar nearby reports...</span>';
+
+        fetch('/api/nearby-duplicates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latitude: lat, longitude: lon, category: category, description: description })
+        }).then(res => res.json()).then(data => {
+            if (data.length > 0) {
+                dupDiv.style.display = 'block';
+                let html = '<div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px;">';
+                html += '<i class="fas fa-exclamation-triangle" style="color: var(--warning); font-size: 18px;"></i>';
+                html += '<div>';
+                html += '<h5 style="margin: 0; color: var(--warning); font-size: 14px;">Potential Duplicate Reports Found</h5>';
+                html += '<p style="margin: 0; font-size: 11px; color: var(--text-secondary);">These similar complaints already exist nearby. Consider upvoting them instead!</p>';
+                html += '</div></div>';
+                html += '<div style="display: flex; flex-direction: column; gap: 8px;">';
+                data.forEach(d => {
+                    const matchColor = d.match_score >= 80 ? '#ef4444' : d.match_score >= 50 ? '#f59e0b' : '#3b82f6';
+                    const matchLabel = d.match_score >= 80 ? 'Very Likely Duplicate' : d.match_score >= 50 ? 'Possibly Related' : 'Nearby';
+                    html += `<div style="padding: 10px; background: rgba(99,102,241,0.05); border: 1px solid rgba(99,102,241,0.15); border-radius: 8px;">`;
+                    html += `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">`;
+                    html += `<a href="/complaint/${d.id}" target="_blank" style="color: var(--info); text-decoration: underline; font-weight: 600;">#${d.id} — ${d.category}</a>`;
+                    html += `<span style="font-size: 10px; padding: 2px 8px; border-radius: 10px; background: ${matchColor}22; color: ${matchColor}; font-weight: 600;">${matchLabel} · ${d.match_score}%</span>`;
+                    html += `</div>`;
+                    html += `<p style="margin: 0; font-size: 12px; color: var(--text-secondary); line-height: 1.4;">${d.description_preview}</p>`;
+                    html += `<div style="display: flex; gap: 12px; margin-top: 4px; font-size: 11px; color: var(--text-secondary);">`;
+                    html += `<span><i class="fas fa-map-marker-alt"></i> ${d.distance_m}m away</span>`;
+                    html += `<span><i class="fas fa-circle" style="color: ${d.status === 'Pending' ? '#f59e0b' : '#22c55e'}; font-size: 6px; vertical-align: middle;"></i> ${d.status}</span>`;
+                    html += `</div></div>`;
+                });
+                html += '</div>';
+                dupDiv.innerHTML = html;
+            } else {
+                dupDiv.style.display = 'none';
+            }
+        }).catch(e => {
+            console.error('Duplicate check error:', e);
             dupDiv.style.display = 'none';
-        }
-    }).catch(e => console.error(e));
+        });
+    }, 600);
 }
 
 // MULTIMEDIA PREVIEW & VALIDATION
