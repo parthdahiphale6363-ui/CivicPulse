@@ -59,30 +59,41 @@
     </div>
 
     <!-- Priority Stats -->
-    <div class="dashboard-stats" style="margin-bottom: 36px;">
+    <div class="dashboard-stats" style="margin-bottom: 36px; display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px;">
         <div class="dash-stat reveal">
             <div class="dash-stat-header">
-                <span style="color: var(--text-secondary);">High Priority</span>
-                <i class="fas fa-exclamation-circle" style="color: var(--danger);"></i>
+                <span style="color: var(--text-secondary); font-size: 13px;">Urgent</span>
+                <i class="fas fa-exclamation-circle" style="color: var(--danger); animation: pulse 2s infinite;"></i>
             </div>
-            <div class="dash-stat-value" style="color: var(--danger);">{{ high }}</div>
-            <div class="dash-stat-label">Urgent Issues</div>
+            <div class="dash-stat-value" style="color: var(--danger);">{{ urgent }}</div>
         </div>
         <div class="dash-stat reveal">
             <div class="dash-stat-header">
-                <span style="color: var(--text-secondary);">Medium Priority</span>
-                <i class="fas fa-exclamation-triangle" style="color: var(--warning);"></i>
+                <span style="color: var(--text-secondary); font-size: 13px;">High Priority</span>
+                <i class="fas fa-arrow-up" style="color: #f97316;"></i>
+            </div>
+            <div class="dash-stat-value" style="color: #f97316;">{{ high }}</div>
+        </div>
+        <div class="dash-stat reveal">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary); font-size: 13px;">Medium Priority</span>
+                <i class="fas fa-minus" style="color: var(--warning);"></i>
             </div>
             <div class="dash-stat-value" style="color: var(--warning);">{{ medium }}</div>
-            <div class="dash-stat-label">Moderate Issues</div>
         </div>
         <div class="dash-stat reveal">
             <div class="dash-stat-header">
-                <span style="color: var(--text-secondary);">Low Priority</span>
-                <i class="fas fa-info-circle" style="color: var(--success);"></i>
+                <span style="color: var(--text-secondary); font-size: 13px;">Low Priority</span>
+                <i class="fas fa-arrow-down" style="color: var(--success);"></i>
             </div>
             <div class="dash-stat-value" style="color: var(--success);">{{ low }}</div>
-            <div class="dash-stat-label">Minor Issues</div>
+        </div>
+        <div class="dash-stat reveal">
+            <div class="dash-stat-header">
+                <span style="color: var(--text-secondary); font-size: 13px;">Info / Other</span>
+                <i class="fas fa-info-circle" style="color: var(--info);"></i>
+            </div>
+            <div class="dash-stat-value" style="color: var(--info);">{{ info }}</div>
         </div>
     </div>
 
@@ -482,8 +493,8 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Hotspots Map
     hotspotsMapInstance = L.map('hotspotsMap').setView([20.5937, 78.9629], 5);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-        attribution: '&copy; OpenStreetMap &copy; CARTO'
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
     }).addTo(hotspotsMapInstance);
 
     

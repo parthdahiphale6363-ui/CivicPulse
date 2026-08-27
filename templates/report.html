@@ -185,8 +185,9 @@ document.addEventListener('DOMContentLoaded', function() {
         attributionControl: false
     }).setView([20.5937, 78.9629], 5);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 19
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap contributors'
     }).addTo(reportMap);
 
     // Click to place marker
@@ -338,14 +339,26 @@ document.addEventListener('DOMContentLoaded', function() {
 </script>
 
 
-            <!-- Priority Preview -->
-            <div id="priorityPreview" style="background: rgba(99, 102, 241, 0.05); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: var(--radius-md); padding: 14px; margin-bottom: 20px; display: none;">
-                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                    <i class="fas fa-flag" style="color: var(--primary-light);"></i>
-                    <strong style="font-size: 13px; color: var(--text-secondary);">Estimated Priority:</strong>
+            <!-- AI Priority Engine Preview -->
+            <div id="priorityPreview" style="background: linear-gradient(135deg, rgba(99, 102, 241, 0.05), rgba(6, 182, 212, 0.05)); border: 1px solid rgba(99, 102, 241, 0.15); border-radius: var(--radius-md); padding: 16px; margin-bottom: 20px; display: none;">
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                    <i class="fas fa-brain" style="color: var(--primary-light); font-size: 16px;"></i>
+                    <strong style="font-size: 13px; color: var(--text-secondary);">AI Priority Engine:</strong>
                     <span id="priorityBadge" class="priority-badge"></span>
                 </div>
-                <p style="color: var(--text-muted); font-size: 12px;">This is auto-assigned based on category. AI may adjust it after analysis.</p>
+                <div id="priorityFactors" style="display: flex; flex-wrap: wrap; gap: 6px;"></div>
+                <style>
+                    .factor-tag {
+                        display: inline-flex; align-items: center; gap: 4px;
+                        padding: 3px 10px; background: rgba(99, 102, 241, 0.08);
+                        border: 1px solid rgba(99, 102, 241, 0.15); border-radius: 20px;
+                        font-size: 11px; color: var(--text-secondary); font-weight: 500;
+                    }
+                    .factor-tag i { color: var(--primary-light); font-size: 9px; }
+                </style>
+                <p style="color: var(--text-muted); font-size: 11px; margin-top: 8px;">
+                    <i class="fas fa-info-circle"></i> Live score updates as you type. Final priority is computed server-side with full AI analysis.
+                </p>
             </div>
 
             <div style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.15); border-radius: var(--radius-md); padding: 14px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px;">
@@ -372,20 +385,100 @@ document.addEventListener('DOMContentLoaded', function() {
 
 {% block extra_js %}
 <script>
-// Priority preview based on category
-const priorityMap = {
-    'Pothole': 'High', 'Garbage': 'Medium', 'Water Leakage': 'High',
-    'Streetlight': 'Medium', 'Sewage': 'High', 'Noise Pollution': 'Low',
-    'Illegal Dumping': 'Medium', 'Road Damage': 'High', 'Traffic Signal': 'High', 'Other': 'Low'
+// ==================== ADVANCED PRIORITY PREVIEW ====================
+const categoryRisk = {
+    'Pothole': 65, 'Garbage': 35, 'Water Leakage': 70,
+    'Streetlight': 45, 'Sewage': 75, 'Noise Pollution': 20,
+    'Illegal Dumping': 40, 'Road Damage': 70, 'Traffic Signal': 80, 'Other': 25
 };
 
-document.getElementById('categorySelect').addEventListener('change', function() {
-    const priority = priorityMap[this.value] || 'Low';
+const emergencyKeywords = [
+    'accident', 'injured', 'injury', 'death', 'collapse', 'flooding', 'flood',
+    'fire', 'burning', 'electrocution', 'child', 'children', 'school', 'hospital',
+    'danger', 'dangerous', 'life threatening', 'emergency', 'sinkhole', 'gas leak',
+    'toxic', 'drowning', 'trapped'
+];
+
+const severityKeywords = {
+    'major': 15, 'massive': 20, 'huge': 15, 'deep': 15, 'large': 10,
+    'overflowing': 20, 'burst': 25, 'broken': 10, 'destroyed': 20,
+    'blocked': 15, 'daily': 10, 'frequent': 10, 'multiple': 10,
+    'spreading': 15, 'stinking': 15, 'contaminated': 20,
+    'accidents': 20, 'damage': 15, 'vehicles': 10, 'completely': 15, 'worst': 20
+};
+
+function calculatePriorityPreview() {
+    const category = document.getElementById('categorySelect').value;
+    const desc = (document.getElementById('descriptionInput').value || '').toLowerCase();
     const preview = document.getElementById('priorityPreview');
     const badge = document.getElementById('priorityBadge');
+    const factors = document.getElementById('priorityFactors');
+
+    if (!category) { preview.style.display = 'none'; return; }
+
+    let score = categoryRisk[category] || 25;
+    let factorList = [`Base: ${category} (${score})`];
+
+    // Emergency keyword check
+    for (const kw of emergencyKeywords) {
+        if (desc.includes(kw)) {
+            score = 98;
+            factorList = [`Emergency: "${kw}" detected`];
+            break;
+        }
+    }
+
+    // Severity keywords
+    if (score < 98) {
+        let boost = 0;
+        let matched = [];
+        for (const [kw, val] of Object.entries(severityKeywords)) {
+            if (desc.includes(kw)) { boost += val; matched.push(kw); }
+        }
+        boost = Math.min(boost, 35);
+        if (boost > 0) {
+            score += boost;
+            factorList.push(`Severity: ${matched.slice(0,3).join(', ')} (+${boost})`);
+        }
+
+        // Word count
+        const words = desc.split(/\s+/).filter(w => w).length;
+        if (words > 50) { score += 8; factorList.push(`Detail: ${words} words (+8)`); }
+        else if (words > 25) { score += 4; factorList.push(`Detail: ${words} words (+4)`); }
+
+        // Media check
+        const hasImg = document.querySelector('input[name="image"]')?.files?.length > 0;
+        const hasVid = document.querySelector('input[name="video"]')?.files?.length > 0;
+        if (hasImg && hasVid) { score += 12; factorList.push('Evidence: Photo+Video (+12)'); }
+        else if (hasImg) { score += 7; factorList.push('Evidence: Photo (+7)'); }
+        else if (hasVid) { score += 10; factorList.push('Evidence: Video (+10)'); }
+
+        // Time context
+        const hour = new Date().getHours();
+        if (category === 'Streetlight' && (hour >= 18 || hour <= 6)) {
+            score += 15; factorList.push('Time: Dark hours (+15)');
+        }
+    }
+
+    score = Math.max(0, Math.min(100, score));
+
+    let priority, icon;
+    if (score >= 80) { priority = 'Urgent'; icon = 'fa-bolt'; }
+    else if (score >= 60) { priority = 'High'; icon = 'fa-exclamation-circle'; }
+    else if (score >= 40) { priority = 'Medium'; icon = 'fa-exclamation-triangle'; }
+    else if (score >= 20) { priority = 'Low'; icon = 'fa-info-circle'; }
+    else { priority = 'Info'; icon = 'fa-comment'; }
+
     preview.style.display = 'block';
-    badge.textContent = priority;
+    badge.textContent = `${priority} (${score}/100)`;
     badge.className = 'priority-badge priority-' + priority.toLowerCase();
+    factors.innerHTML = factorList.map(f => `<span class="factor-tag"><i class="fas fa-caret-right"></i> ${f}</span>`).join('');
+}
+
+document.getElementById('categorySelect').addEventListener('change', calculatePriorityPreview);
+document.getElementById('descriptionInput').addEventListener('input', function() {
+    clearTimeout(this._debounce);
+    this._debounce = setTimeout(calculatePriorityPreview, 400);
 });
 
 // --- Multilingual Voice Recording Logic ---

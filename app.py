@@ -627,21 +627,121 @@ def admin_required(f):
     return decorated_function
 
 
-# ---------------- PRIORITY LOGIC ----------------
+# ---------------- ADVANCED AI PRIORITY ENGINE ----------------
+# Base risk scores by category (0-100)
+CATEGORY_RISK = {
+    "Pothole": 65, "Garbage": 35, "Water Leakage": 70,
+    "Streetlight": 45, "Sewage": 75, "Noise Pollution": 20,
+    "Illegal Dumping": 40, "Road Damage": 70, "Traffic Signal": 80,
+    "Other": 25
+}
+
+# Emergency keywords that instantly escalate to Urgent
+EMERGENCY_KEYWORDS = [
+    "accident", "injured", "injury", "death", "died", "collapse", "collapsed",
+    "flooding", "flood", "fire", "burning", "electrocution", "electric shock",
+    "child", "children", "school", "hospital", "ambulance", "danger", "dangerous",
+    "life threatening", "life-threatening", "emergency", "sinkhole", "cave in",
+    "gas leak", "toxic", "poisonous", "drowning", "trapped"
+]
+
+# Severity-boosting keywords (add +10-25 to risk score)
+HIGH_SEVERITY_KEYWORDS = {
+    "major": 15, "massive": 20, "huge": 15, "deep": 15, "large": 10,
+    "overflowing": 20, "burst": 25, "broken": 10, "destroyed": 20,
+    "blocked": 15, "daily": 10, "frequent": 10, "multiple": 10,
+    "spreading": 15, "stinking": 15, "contaminated": 20, "sewage": 15,
+    "accidents": 20, "damage": 15, "vehicles": 10, "commuters": 10,
+    "residents": 10, "entire": 15, "completely": 15, "worst": 20
+}
+
+def determine_priority(category, description, is_emergency=False, has_image=False, has_video=False):
+    """
+    Advanced multi-factor priority engine.
+    Analyzes category risk, keywords, media evidence, and context
+    to produce a structured priority: Urgent / High / Medium / Low / Info.
+    Returns: (priority_label, priority_score, factors_list)
+    """
+    desc_lower = description.lower() if description else ""
+    factors = []
+    
+    # 1. Base category risk (0-100)
+    base_score = CATEGORY_RISK.get(category, 25)
+    factors.append(f"Category '{category}' base risk: {base_score}/100")
+    
+    # 2. Emergency check — instant Urgent
+    if is_emergency:
+        return ("Urgent", 100, ["Emergency checkbox activated — immediate escalation"])
+    
+    # 3. Emergency keyword scan
+    for keyword in EMERGENCY_KEYWORDS:
+        if keyword in desc_lower:
+            factors.append(f"Emergency keyword detected: '{keyword}'")
+            return ("Urgent", 98, factors)
+    
+    # 4. Severity keyword boost
+    keyword_boost = 0
+    matched_keywords = []
+    for keyword, boost in HIGH_SEVERITY_KEYWORDS.items():
+        if keyword in desc_lower:
+            keyword_boost += boost
+            matched_keywords.append(keyword)
+    if keyword_boost > 0:
+        keyword_boost = min(keyword_boost, 35)  # Cap at +35
+        base_score += keyword_boost
+        factors.append(f"Severity keywords ({', '.join(matched_keywords[:5])}): +{keyword_boost}")
+    
+    # 5. Description length/detail bonus (detailed reports = more serious)
+    word_count = len(desc_lower.split())
+    if word_count > 50:
+        base_score += 8
+        factors.append(f"Detailed description ({word_count} words): +8")
+    elif word_count > 25:
+        base_score += 4
+        factors.append(f"Moderate detail ({word_count} words): +4")
+    
+    # 6. Media evidence boost
+    if has_image and has_video:
+        base_score += 12
+        factors.append("Photo + Video evidence: +12")
+    elif has_image:
+        base_score += 7
+        factors.append("Photo evidence: +7")
+    elif has_video:
+        base_score += 10
+        factors.append("Video evidence: +10")
+    
+    # 7. Time-of-day context
+    from datetime import datetime
+    current_hour = datetime.now().hour
+    if category == "Streetlight" and (current_hour >= 18 or current_hour <= 6):
+        base_score += 15
+        factors.append("Streetlight issue during dark hours: +15")
+    elif category in ["Pothole", "Road Damage"] and 7 <= current_hour <= 10:
+        base_score += 8
+        factors.append("Road issue during peak commute hours: +8")
+    
+    # 8. Clamp score and determine level
+    final_score = max(0, min(100, base_score))
+    
+    if final_score >= 80:
+        priority = "Urgent"
+    elif final_score >= 60:
+        priority = "High"
+    elif final_score >= 40:
+        priority = "Medium"
+    elif final_score >= 20:
+        priority = "Low"
+    else:
+        priority = "Info"
+    
+    factors.append(f"Final score: {final_score}/100 → {priority}")
+    return (priority, final_score, factors)
+
 def get_priority(category):
-    priority_map = {
-        "Pothole": "High",
-        "Garbage": "Medium",
-        "Water Leakage": "High",
-        "Streetlight": "Medium",
-        "Sewage": "High",
-        "Noise Pollution": "Low",
-        "Illegal Dumping": "Medium",
-        "Road Damage": "High",
-        "Traffic Signal": "High",
-        "Other": "Low"
-    }
-    return priority_map.get(category, "Low")
+    """Legacy wrapper for backward compatibility."""
+    priority, _, _ = determine_priority(category, "")
+    return priority
 
 
 # ---------------- CONTEXT PROCESSOR ----------------
@@ -731,7 +831,6 @@ def submit_report():
 
     is_emergency = 1 if request.form.get("is_emergency") else 0
     is_anonymous = 1 if request.form.get("is_anonymous") else 0
-    priority = "Urgent" if is_emergency else get_priority(category)
     status = "Pending"
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -801,20 +900,34 @@ Return ONLY JSON."""
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], v_filename))
             video_url = f"/static/uploads/{v_filename}"
 
-    # AI Analysis of the complaint (including media context)
+    # --- ADVANCED PRIORITY DETERMINATION ---
+    priority, priority_score, priority_factors = determine_priority(
+        category=category,
+        description=description,
+        is_emergency=bool(is_emergency),
+        has_image=bool(image_url),
+        has_video=bool(video_url)
+    )
+    priority_context = " | ".join(priority_factors)
+    print(f"PRIORITY ENGINE: {priority} (score={priority_score}) — {priority_context}")
+
+    # AI Analysis of the complaint (including media + priority context)
     ai_prompt = f"""Analyze this local problem complaint. Multimedia proof was provided: {"Photo attached (" + vision_extra_context + ")" if image_url else "No photo"}, {"Video attached (15s)" if video_url else "No video"}.
 Category: {category}
 Description: {description}
 Location: {location}
+AI Priority Engine Result: {priority} (Score: {priority_score}/100)
+Priority Factors: {priority_context}
 
 Provide:
-1. Severity assessment (1-2 sentences)
-2. Priority recommendation (High/Medium/Low)
-3. Action plan for the department
-Keep it under 150 words."""
+1. Severity assessment with specific impact analysis (2-3 sentences)
+2. Validate or adjust the AI priority rating ({priority}) with reasoning
+3. Detailed action plan for the responsible department
+4. Estimated resolution timeline
+Keep it under 200 words."""
 
-    ai_analysis = ask_groq(ai_prompt, "You are an expert municipal problem analyst. Media visibility adds urgency.")
-    ai_suggestion = ask_groq(f"Resolution steps for: {category} - {description}", "Give 2-3 actionable steps.")
+    ai_analysis = ask_groq(ai_prompt, "You are an expert municipal problem analyst with deep knowledge of Indian civic infrastructure. Media visibility adds urgency.")
+    ai_suggestion = ask_groq(f"Resolution steps for: {category} - {description}\nPriority: {priority} (Score: {priority_score}/100)", "Give 3-4 actionable steps ordered by urgency.")
 
     conn = get_db_connection()
     
@@ -1551,9 +1664,11 @@ def dashboard():
     conn = get_db_connection()
 
     total = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()[0]
+    urgent = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Urgent'").fetchone()[0]
     high = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='High'").fetchone()[0]
     medium = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Medium'").fetchone()[0]
     low = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Low'").fetchone()[0]
+    info = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Info'").fetchone()[0]
     resolved = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Resolved'").fetchone()[0]
     pending = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Pending'").fetchone()[0]
     users_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
@@ -1574,7 +1689,7 @@ def dashboard():
 
     return render_template(
         "dashboard.html",
-        total=total, high=high, medium=medium, low=low,
+        total=total, urgent=urgent, high=high, medium=medium, low=low, info=info,
         resolved=resolved, pending=pending, users_count=users_count,
         categories=categories, recent=recent, announcements=announcements
     )
@@ -2084,9 +2199,11 @@ def api_stats():
     total = conn.execute("SELECT COUNT(*) FROM complaints").fetchone()[0]
     resolved = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Resolved'").fetchone()[0]
     pending = conn.execute("SELECT COUNT(*) FROM complaints WHERE status='Pending'").fetchone()[0]
+    urgent = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Urgent'").fetchone()[0]
     high = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='High'").fetchone()[0]
     medium = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Medium'").fetchone()[0]
     low = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Low'").fetchone()[0]
+    info = conn.execute("SELECT COUNT(*) FROM complaints WHERE priority='Info'").fetchone()[0]
 
     categories = conn.execute("""
         SELECT category, COUNT(*) as count FROM complaints GROUP BY category
@@ -2096,7 +2213,7 @@ def api_stats():
 
     return jsonify({
         "total": total, "resolved": resolved, "pending": pending,
-        "high": high, "medium": medium, "low": low,
+        "urgent": urgent, "high": high, "medium": medium, "low": low, "info": info,
         "categories": [{"name": c["category"], "count": c["count"]} for c in categories]
     })
 
