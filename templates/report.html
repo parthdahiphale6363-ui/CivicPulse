@@ -248,6 +248,9 @@ function reverseGeocode(lat, lng) {
 }
 
 // ==================== HIGH-ACCURACY GPS ====================
+let gpsWatchId = null;
+let gpsTimeoutId = null;
+
 function getCurrentLocation() {
     const btn = document.getElementById('gpsBtn');
     const status = document.getElementById('locEnhanceStatus');
@@ -257,11 +260,24 @@ function getCurrentLocation() {
         return;
     }
 
+    if (gpsWatchId) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+        clearTimeout(gpsTimeoutId);
+    }
+
     btn.disabled = true;
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acquiring GPS...';
     status.innerHTML = '<span style="color: var(--info);"><i class="fas fa-satellite-dish"></i> Requesting high-accuracy satellite fix...</span>';
 
-    navigator.geolocation.getCurrentPosition(
+    // Timeout after 15 seconds if we can't get a good fix
+    gpsTimeoutId = setTimeout(() => {
+        if(gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+        status.innerHTML += '<br><span style="color: var(--warning); font-size: 11px;">GPS search timed out. Using best available accuracy.</span>';
+    }, 15000);
+
+    gpsWatchId = navigator.geolocation.watchPosition(
         (position) => {
             const lat = position.coords.latitude;
             const lon = position.coords.longitude;
@@ -292,14 +308,20 @@ function getCurrentLocation() {
                 badge.style.background = 'rgba(245,158,11,0.15)'; badge.style.color = '#f59e0b';
             }
 
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+            // Once accuracy is good enough, stop watching to save battery
+            if (acc <= 30) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                clearTimeout(gpsTimeoutId);
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+            }
         },
         (error) => {
             const msgs = {1:'Location permission denied',2:'Position unavailable',3:'Request timed out'};
             status.innerHTML = `<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> ${msgs[error.code] || 'GPS error'}. Enable location in browser settings.</span>`;
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+            clearTimeout(gpsTimeoutId);
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
@@ -624,13 +646,14 @@ function enhanceDescription() {
 
 // AI Enhance Location
 function enhanceLocation() {
-    // ...
     const loc = document.getElementById('locationInput').value.trim();
+    const lat = document.getElementById('latitudeInput').value;
+    const lng = document.getElementById('longitudeInput').value;
     const btn = document.getElementById('enhanceLocBtn');
     const status = document.getElementById('locEnhanceStatus');
 
-    if (!loc) {
-        status.innerHTML = '<span style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> Please enter a location first.</span>';
+    if (!loc && (!lat || !lng)) {
+        status.innerHTML = '<span style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> Please select a location on the map first.</span>';
         setTimeout(() => status.innerHTML = '', 3000);
         return;
     }
@@ -642,7 +665,7 @@ function enhanceLocation() {
     fetch('/api/enhance-location', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ location: loc })
+        body: JSON.stringify({ location: loc, latitude: lat, longitude: lng })
     })
     .then(res => res.json())
     .then(data => {

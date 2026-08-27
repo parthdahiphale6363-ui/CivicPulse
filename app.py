@@ -242,44 +242,62 @@ Analyze this and return ONLY a JSON object:
         })
 
 def ask_groq_vision(base64_image, prompt="Analyze this image."):
-    """Text-based image validation fallback (no vision model available on Groq).
-    Analyzes image metadata via text model for basic plausibility check."""
+    """True Multimodal Image Validation using LLaMA 3.2 Vision on Groq."""
     if not GROQ_API_KEY:
         return None
     try:
         import base64
-        # Extract image metadata for text-based analysis
+        import requests
+        
+        # Extract image bytes to determine type
         img_bytes = base64.b64decode(base64_image)
-        img_size_kb = len(img_bytes) / 1024
         
         # Detect image type from magic bytes
-        img_type = "unknown"
+        img_type = "jpeg"
         if img_bytes[:2] == b'\xff\xd8':
-            img_type = "JPEG"
+            img_type = "jpeg"
         elif img_bytes[:4] == b'\x89PNG':
-            img_type = "PNG"
+            img_type = "png"
         elif img_bytes[:3] == b'GIF':
-            img_type = "GIF"
+            img_type = "gif"
         elif img_bytes[:4] == b'RIFF':
-            img_type = "WEBP"
+            img_type = "webp"
+            
+        headers = {
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        }
         
-        # Use text model for plausibility (cannot actually see the image)
-        fallback_prompt = f"""A citizen uploaded a {img_type} image ({img_size_kb:.0f} KB) as evidence for a civic complaint.
-The original prompt was: {prompt}
-
-Since we cannot visually analyze this image, provide a default validation response.
-Assuming the image is valid civic evidence, respond with ONLY this JSON:
-{{
-  "is_valid": true,
-  "reason": "Image accepted ({img_type}, {img_size_kb:.0f}KB). Visual verification pending.",
-  "issue_type": "Unknown",
-  "severity_clues": "Visual analysis unavailable — text description will be used for severity assessment."
-}}"""
-        result = ask_groq(fallback_prompt, "You are a civic data validator. Return only JSON.")
-        print(f"VISION FALLBACK: No vision model available. Using text-based validation ({img_type}, {img_size_kb:.0f}KB)")
-        return result
+        data = {
+            "model": "qwen/qwen3.8-27b",
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/{img_type};base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            "temperature": 0.2,
+            "max_tokens": 1024
+        }
+        
+        response = requests.post(GROQ_API_URL, headers=headers, json=data, timeout=30)
+        if response.status_code != 200:
+            print(f"GROQ VISION ERROR: {response.status_code} - {response.text}")
+            return None
+            
+        raw = response.json()["choices"][0]["message"]["content"]
+        return strip_think_tags(raw)
+        
     except Exception as e:
-        print(f"GROQ VISION FALLBACK ERROR: {str(e)}")
+        print(f"GROQ VISION FATAL ERROR: {str(e)}")
         return None
 
 
@@ -664,6 +682,7 @@ def determine_priority(category, description, is_emergency=False, has_image=Fals
     """
     desc_lower = description.lower() if description else ""
     factors = []
+    has_emergency_signal = False
     
     # 1. Base category risk (0-100)
     base_score = CATEGORY_RISK.get(category, 25)
@@ -671,11 +690,13 @@ def determine_priority(category, description, is_emergency=False, has_image=Fals
     
     # 2. Emergency check — instant Urgent
     if is_emergency:
+        has_emergency_signal = True
         return ("Urgent", 100, ["Emergency checkbox activated — immediate escalation"])
     
     # 3. Emergency keyword scan
     for keyword in EMERGENCY_KEYWORDS:
         if keyword in desc_lower:
+            has_emergency_signal = True
             factors.append(f"Emergency keyword detected: '{keyword}'")
             return ("Urgent", 98, factors)
     
@@ -723,6 +744,11 @@ def determine_priority(category, description, is_emergency=False, has_image=Fals
     
     # 8. Clamp score and determine level
     final_score = max(0, min(100, base_score))
+    
+    # STRICT CAPPING: Prevent standard issues from becoming Urgent without an emergency signal
+    if not has_emergency_signal and final_score >= 80:
+        final_score = 79
+        factors.append("Score capped at 79 (High) — no explicit emergency signals detected")
     
     if final_score >= 80:
         priority = "Urgent"
@@ -1078,18 +1104,24 @@ def enhance_description():
 
 @app.route("/api/enhance-location", methods=["POST"])
 def enhance_location():
-    """Hyper-Accurate Location Engine: Refines address and identifies landmarks."""
+    """Hyper-Accurate Location Engine: Refines address using text and coordinates."""
     data = request.get_json()
     raw_location = data.get("location", "").strip()
+    lat = data.get("latitude")
+    lng = data.get("longitude")
     
-    if not raw_location:
-        return jsonify({"error": "Please enter a location first."})
+    if not raw_location and not (lat and lng):
+        return jsonify({"error": "Please enter or select a location first."})
 
-    prompt = f"""A citizen reported an issue at: "{raw_location}"
-Refine this into a highly accurate location reading. Respond with pure JSON:
+    coords_info = f" (Exact GPS Coordinates: {lat}, {lng})" if lat and lng else ""
+
+    prompt = f"""A citizen reported a civic issue at: "{raw_location}"{coords_info}
+Use your geospatial knowledge to refine this into a highly accurate, clean, local-friendly address. 
+Remove overly verbose country/state names if it's clearly a local issue.
+Respond with pure JSON:
 {{
   "refined_address": "Cleaned up standard string",
-  "nearby_landmarks": ["List of likely landmarks or intersections nearby"],
+  "nearby_landmarks": ["List 2-3 specific local landmarks, shops, or intersections nearby"],
   "confidence_score": 90 // 1-100 integer
 }}
 Do NOT include any markdown."""
