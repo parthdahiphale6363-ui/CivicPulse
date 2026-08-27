@@ -178,6 +178,14 @@ input:checked + .slider-anon:before { transform: translateX(24px); }
 // ==================== LEAFLET MAP INITIALIZATION ====================
 let reportMap, reportMarker, accuracyCircle;
 
+// Fix Leaflet's default icon path issues when using CDN
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+    iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+    iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+    shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+});
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize map centered on India (default)
     reportMap = L.map('locationMap', {
@@ -269,62 +277,88 @@ function getCurrentLocation() {
     btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Acquiring GPS...';
     status.innerHTML = '<span style="color: var(--info);"><i class="fas fa-satellite-dish"></i> Requesting high-accuracy satellite fix...</span>';
 
-    // Timeout after 15 seconds if we can't get a good fix
+    // Timeout after 15 seconds if we can\'t get a good fix, fallback to standard GPS
     gpsTimeoutId = setTimeout(() => {
         if(gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
-        status.innerHTML += '<br><span style="color: var(--warning); font-size: 11px;">GPS search timed out. Using best available accuracy.</span>';
+        status.innerHTML = '<span style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> High-accuracy timeout. Trying standard location...</span>';
+        
+        // Fallback
+        navigator.geolocation.getCurrentPosition(
+            (pos) => handlePositionSuccess(pos, btn, status, false),
+            (err) => handlePositionError(err, btn, status),
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+        );
     }, 15000);
 
     gpsWatchId = navigator.geolocation.watchPosition(
-        (position) => {
-            const lat = position.coords.latitude;
-            const lon = position.coords.longitude;
-            const acc = position.coords.accuracy; // meters
-
-            placeMarker(lat, lon);
-            reverseGeocode(lat, lon);
-            reportMap.setView([lat, lon], 17);
-
-            // Show accuracy circle
-            if (accuracyCircle) reportMap.removeLayer(accuracyCircle);
-            accuracyCircle = L.circle([lat, lon], {
-                radius: acc, color: '#6366f1', fillColor: '#6366f1',
-                fillOpacity: 0.08, weight: 1, dashArray: '5,5'
-            }).addTo(reportMap);
-
-            // Accuracy badge
-            const badge = document.getElementById('accuracyBadge');
-            badge.style.display = 'inline-block';
-            if (acc <= 20) {
-                badge.textContent = `± ${acc.toFixed(0)}m · Excellent`;
-                badge.style.background = 'rgba(34,197,94,0.15)'; badge.style.color = '#22c55e';
-            } else if (acc <= 100) {
-                badge.textContent = `± ${acc.toFixed(0)}m · Good`;
-                badge.style.background = 'rgba(59,130,246,0.15)'; badge.style.color = '#3b82f6';
-            } else {
-                badge.textContent = `± ${acc.toFixed(0)}m · Approximate`;
-                badge.style.background = 'rgba(245,158,11,0.15)'; badge.style.color = '#f59e0b';
-            }
-
-            // Once accuracy is good enough, stop watching to save battery
-            if (acc <= 30) {
-                navigator.geolocation.clearWatch(gpsWatchId);
-                clearTimeout(gpsTimeoutId);
-                btn.disabled = false;
-                btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
-            }
-        },
-        (error) => {
-            const msgs = {1:'Location permission denied',2:'Position unavailable',3:'Request timed out'};
-            status.innerHTML = `<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> ${msgs[error.code] || 'GPS error'}. Enable location in browser settings.</span>`;
-            btn.disabled = false;
-            btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+        (pos) => handlePositionSuccess(pos, btn, status, true),
+        (err) => {
+            if(gpsWatchId) navigator.geolocation.clearWatch(gpsWatchId);
             clearTimeout(gpsTimeoutId);
+            
+            // If high accuracy fails, immediately try standard accuracy
+            if (err.code === 2 || err.code === 3) {
+                status.innerHTML = '<span style="color: var(--warning);"><i class="fas fa-exclamation-triangle"></i> High-accuracy failed. Trying standard location...</span>';
+                navigator.geolocation.getCurrentPosition(
+                    (pos) => handlePositionSuccess(pos, btn, status, false),
+                    (err2) => handlePositionError(err2, btn, status),
+                    { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 }
+                );
+            } else {
+                handlePositionError(err, btn, status);
+            }
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
+}
+
+function handlePositionSuccess(position, btn, status, isHighAccuracy) {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+    const acc = position.coords.accuracy;
+
+    placeMarker(lat, lon);
+    reverseGeocode(lat, lon);
+    reportMap.setView([lat, lon], 17);
+
+    if (accuracyCircle) reportMap.removeLayer(accuracyCircle);
+    accuracyCircle = L.circle([lat, lon], {
+        radius: acc, color: '#6366f1', fillColor: '#6366f1',
+        fillOpacity: 0.08, weight: 1, dashArray: '5,5'
+    }).addTo(reportMap);
+
+    const badge = document.getElementById('accuracyBadge');
+    badge.style.display = 'inline-block';
+    if (acc <= 30) {
+        badge.textContent = `± ${acc.toFixed(0)}m · Excellent`;
+        badge.style.background = 'rgba(34,197,94,0.15)'; badge.style.color = '#22c55e';
+    } else if (acc <= 150) {
+        badge.textContent = `± ${acc.toFixed(0)}m · Good`;
+        badge.style.background = 'rgba(59,130,246,0.15)'; badge.style.color = '#3b82f6';
+    } else {
+        badge.textContent = `± ${acc.toFixed(0)}m · Approximate`;
+        badge.style.background = 'rgba(245,158,11,0.15)'; badge.style.color = '#f59e0b';
+    }
+
+    if (isHighAccuracy && acc <= 40) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+        clearTimeout(gpsTimeoutId);
+    }
+    
+    if (!isHighAccuracy) {
+        clearTimeout(gpsTimeoutId);
+    }
+
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+}
+
+function handlePositionError(error, btn, status) {
+    const msgs = {1:'Location permission denied', 2:'Position unavailable', 3:'Request timed out'};
+    status.innerHTML = `<span style="color: var(--danger);"><i class="fas fa-times-circle"></i> ${msgs[error.code] || 'GPS error'}. Check browser settings.</span>`;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-crosshairs"></i> 📍 High-Accuracy GPS';
+    clearTimeout(gpsTimeoutId);
 }
 
 // ==================== ADDRESS SEARCH ====================
