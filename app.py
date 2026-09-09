@@ -143,32 +143,64 @@ def strip_think_tags(text):
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
     return cleaned if cleaned else text
 
+# Retry config for Groq rate limits
+MAX_RETRIES = 3
+BASE_BACKOFF_SECONDS = 2
+
 def ask_groq(prompt, system_message="You are a helpful assistant."):
     """Send a prompt to Groq AI and return the response text."""
     if not GROQ_API_KEY:
         return "AI service not configured. Please set GROQ_API_KEY environment variable."
-    try:
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        data = {
-            "model": "qwen/qwen3.8-27b",
-            "messages": [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": 0.7,
-            "max_tokens": 1024
-        }
-        response = requests.post(GROQ_API_URL, headers=headers, json=data, timeout=30)
-        if response.status_code != 200:
+        
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "qwen/qwen3.8-27b",
+        "messages": [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.7,
+        "max_tokens": 1024
+    }
+    
+    last_error = None
+    import time
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = requests.post(GROQ_API_URL, headers=headers, json=data, timeout=30)
+            
+            # Handle 429 rate limit with retry
+            if response.status_code == 429:
+                retry_after = response.headers.get("Retry-After")
+                if retry_after:
+                    wait = float(retry_after)
+                else:
+                    wait = BASE_BACKOFF_SECONDS * (2 ** attempt)
+                print(f"GROQ: Rate limited (429). Retrying in {wait}s (attempt {attempt + 1}/{MAX_RETRIES + 1})")
+                if attempt < MAX_RETRIES:
+                    time.sleep(wait)
+                    continue
+                else:
+                    response.raise_for_status()  # Final attempt
+                    
+            if response.status_code != 200:
+                return None
+                
+            raw = response.json()["choices"][0]["message"]["content"]
+            return strip_think_tags(raw)
+        except Exception as e:
+            last_error = e
+            if response is not None and response.status_code == 429 and attempt < MAX_RETRIES:
+                continue
+            print(f"GROQ ERROR: {str(e)}")
             return None
-        raw = response.json()["choices"][0]["message"]["content"]
-        return strip_think_tags(raw)
-    except Exception as e:
-        print(f"GROQ ERROR: {str(e)}")
-        return None
+            
+    print(f"GROQ ERROR: All {MAX_RETRIES + 1} attempts failed. Last error: {last_error}")
+    return None
+
 
 def transcribe_audio(file_path):
     """Transcribe audio file using Groq's Whisper model."""
@@ -894,6 +926,8 @@ def live_pulse():
     conn.close()
     
     live_summary = ask_groq(f"Summary for today: {total_today} new reports. {total_resolved} resolved. Output 1 punchy civic headline.", "Live Pulse News Anchor.")
+    if not live_summary:
+        live_summary = f"City sensors active. {total_today} incoming reports monitored in real-time."
     return render_template("live_pulse.html", total_today=total_today, resolved=total_resolved, pending=total_pending, live_summary=live_summary, radar_data=radar_data, dept_stats=dept_stats)
 
 # ---------------- REPORT ----------------
