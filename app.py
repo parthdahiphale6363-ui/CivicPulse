@@ -837,9 +837,22 @@ def home():
     return render_template("index.html", total=total, resolved=resolved, pending=pending, recent=recent, announcements=announcements)
 
 # ---------------- LIVE CITY PULSE ----------------
+# Simple memory cache for news to avoid GNews API rate limits
+news_cache = {
+    "data": None,
+    "timestamp": 0
+}
+CACHE_DURATION = 900 # 15 minutes (900 seconds)
+
 @app.route('/api/civic-news')
 def get_civic_news():
-    """Returns curated municipal and urban development news from GNews API."""
+    """Returns curated municipal and urban development news from GNews API (with caching)."""
+    global news_cache
+    
+    # If we have valid cached data, return it immediately
+    if time.time() - news_cache["timestamp"] < CACHE_DURATION and news_cache["data"]:
+        return jsonify(news_cache["data"])
+
     GNEWS_API_KEY = os.environ.get("GNEWS_API_KEY")
 
     # Fallback data if API is unavailable
@@ -910,10 +923,15 @@ def get_civic_news():
                 "url": url
             })
 
+        # Update the cache with the new fresh data
+        news_cache["data"] = news_items
+        news_cache["timestamp"] = time.time()
+
         return jsonify(news_items)
 
     except Exception as e:
         print(f"GNews API Error: {e}")
+        # If API fails (e.g. rate limit), return fallback data but don't cache it
         return jsonify(fallback_response)
 
 @app.route("/live-pulse")
