@@ -847,11 +847,17 @@ def get_civic_news():
         {"title": "Smart Cities Mission Reaches 2025 Milestone", "summary": "Over 95% of 8,000 sanctioned projects finalized. Integrated Command Centers now operational in 100 cities.", "source": "PIB India", "tag": "Policy"},
         {"title": "AMRUT 2.0: Circular Economy for Water Scaling", "summary": "New 'City Water Balance Plans' introduced to recycle treated sewage across tier-2 cities.", "source": "MoHUA", "tag": "Environment"},
         {"title": "Global Logistics Hub Breakthrough", "summary": "PM Gati Shakti National Master Plan integrates 10+ data layers for urban transport optimization.", "source": "Invest India", "tag": "Infrastructure"},
-        {"title": "Industrial Smart Cities Approved", "summary": "Government greenlights 12 major hubs to boost manufacturing and regional jobs.", "source": "The Hindu", "tag": "Economy"}
+        {"title": "Industrial Smart Cities Approved", "summary": "Government greenlights 12 major hubs to boost manufacturing and regional jobs.", "source": "The Hindu", "tag": "Economy"},
+        {"title": "AI Traffic Management in Mumbai", "summary": "New AI-powered signals reduce congestion by 20% in major intersections.", "source": "TechCity", "tag": "Technology"},
+        {"title": "Solar Panels Mandatory for New Buildings", "summary": "Municipal corporation passes new green building code requiring solar panels for all new commercial properties.", "source": "Civic Times", "tag": "Environment"},
+        {"title": "Digital Property Tax System Launched", "summary": "Citizens can now pay property taxes and track municipal spending through the new unified portal.", "source": "GovTech India", "tag": "Policy"},
+        {"title": "Pothole Repair App Sees 50k Downloads", "summary": "Citizen reporting app leads to record-time repairs of local roads ahead of monsoon season.", "source": "Urban Pulse", "tag": "Civic"}
     ]
+    random.shuffle(fallback_news)
+    fallback_response = fallback_news[:4]
 
     if not GNEWS_API_KEY:
-        return jsonify(fallback_news)
+        return jsonify(fallback_response)
 
     try:
         # Search for civic/municipal news from India
@@ -869,7 +875,7 @@ def get_civic_news():
         articles = res.json().get("articles", [])
 
         if not articles:
-            return jsonify(fallback_news)
+            return jsonify(fallback_response)
 
         # Tag mapping based on keywords in title/description
         def detect_tag(title, desc):
@@ -908,7 +914,7 @@ def get_civic_news():
 
     except Exception as e:
         print(f"GNews API Error: {e}")
-        return jsonify(fallback_news)
+        return jsonify(fallback_response)
 
 @app.route("/live-pulse")
 def live_pulse():
@@ -929,6 +935,8 @@ def live_pulse():
     live_summary = ask_groq(f"Summary for today: {total_today} new reports. {total_resolved} resolved. Output 1 punchy civic headline.", "Live Pulse News Anchor.")
     if not live_summary:
         live_summary = f"City sensors active. {total_today} incoming reports monitored in real-time."
+    else:
+        live_summary = live_summary.replace("**", "").replace("*", "")
     return render_template("live_pulse.html", total_today=total_today, resolved=total_resolved, pending=total_pending, live_summary=live_summary, radar_data=radar_data, dept_stats=dept_stats)
 
 # ---------------- REPORT ----------------
