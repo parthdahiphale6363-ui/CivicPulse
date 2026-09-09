@@ -3,12 +3,17 @@ import os
 import json
 import requests
 import re
+import time
 from datetime import datetime
 
 civic_iq_bp = Blueprint('civic_iq', __name__, template_folder='templates')
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+# Retry config for Groq rate limits
+MAX_RETRIES = 3
+BASE_BACKOFF_SECONDS = 2  # 2s, 4s, 8s exponential backoff
 
 def strip_think_tags(text):
     """Strip <think>...</think> reasoning blocks that Qwen models add to responses."""
@@ -20,28 +25,55 @@ def strip_think_tags(text):
 def ask_groq(prompt, system_message="You are a senior civic intelligence officer in India.", temperature=0.5):
     if not GROQ_API_KEY:
         return None
-    try:
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": "qwen/qwen3.8-27b",
-            "messages": [
-                {"role": "system", "content": system_message},
-                {"role": "user", "content": prompt}
-            ],
-            "temperature": temperature,
-            "max_tokens": 2048,
-            "response_format": {"type": "json_object"}
-        }
-        res = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
-        res.raise_for_status()
-        raw = res.json()["choices"][0]["message"]["content"]
-        return strip_think_tags(raw)
-    except Exception as e:
-        print(f"CivicIQ AI Error: {e}")
-        return None
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "model": "qwen/qwen3.8-27b",
+        "messages": [
+            {"role": "system", "content": system_message},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": temperature,
+        "max_tokens": 2048,
+        "response_format": {"type": "json_object"}
+    }
+
+    last_error = None
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            res = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=30)
+
+            # Handle 429 rate limit with retry
+            if res.status_code == 429:
+                retry_after = res.headers.get("Retry-After")
+                if retry_after:
+                    wait = float(retry_after)
+                else:
+                    wait = BASE_BACKOFF_SECONDS * (2 ** attempt)
+                print(f"CivicIQ: Rate limited (429). Retrying in {wait}s (attempt {attempt + 1}/{MAX_RETRIES + 1})")
+                if attempt < MAX_RETRIES:
+                    time.sleep(wait)
+                    continue
+                else:
+                    res.raise_for_status()  # Final attempt — let it raise
+
+            res.raise_for_status()
+            raw = res.json()["choices"][0]["message"]["content"]
+            return strip_think_tags(raw)
+
+        except Exception as e:
+            last_error = e
+            # Only retry on rate limits; other errors fail immediately
+            if res is not None and res.status_code == 429 and attempt < MAX_RETRIES:
+                continue
+            print(f"CivicIQ AI Error: {e}")
+            return None
+
+    print(f"CivicIQ AI Error: All {MAX_RETRIES + 1} attempts failed. Last error: {last_error}")
+    return None
 
 @civic_iq_bp.route('/civic-iq')
 def civic_iq_home():
