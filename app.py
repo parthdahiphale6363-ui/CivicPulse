@@ -861,6 +861,7 @@ def get_civic_news():
             "lang": "en",
             "country": "in",
             "max": 6,
+            "sortby": "publishedAt",
             "apikey": GNEWS_API_KEY
         }
         res = requests.get(gnews_url, params=params, timeout=10)

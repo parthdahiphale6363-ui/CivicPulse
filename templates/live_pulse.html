@@ -218,7 +218,7 @@
         if (btn) btn.disabled = true;
 
         try {
-            const res = await fetch('/api/civic-news');
+            const res = await fetch('/api/civic-news', { cache: 'no-store' });
             const data = await res.json();
             const feed = document.getElementById('news-feed');
             feed.innerHTML = '';
