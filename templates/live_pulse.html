@@ -229,7 +229,7 @@
                 div.style.animation = `chatFadeIn 0.4s ease-out ${index * 0.1}s both`;
                 div.innerHTML = `
                     <span class="news-tag">${item.tag}</span>
-                    <h4 style="font-size: 15px; margin-bottom: 5px;">${item.title}</h4>
+                    <h4 style="font-size: 15px; margin-bottom: 5px;">${item.url ? `<a href="${item.url}" target="_blank" rel="noopener" style="color: inherit; text-decoration: none;">${item.title} <i class="fas fa-external-link-alt" style="font-size: 10px; opacity: 0.5;"></i></a>` : item.title}</h4>
                     <p style="font-size: 13px; color: var(--text-muted); line-height: 1.4;">${item.summary}</p>
                     <div class="news-source"><i class="fas fa-globe"></i> ${item.source} • Live Updates</div>
                 `;

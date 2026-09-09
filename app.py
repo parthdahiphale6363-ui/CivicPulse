@@ -807,13 +807,75 @@ def home():
 # ---------------- LIVE CITY PULSE ----------------
 @app.route('/api/civic-news')
 def get_civic_news():
-    """Returns curated municipal and urban development news."""
-    return jsonify([
+    """Returns curated municipal and urban development news from GNews API."""
+    GNEWS_API_KEY = os.environ.get("GNEWS_API_KEY")
+
+    # Fallback data if API is unavailable
+    fallback_news = [
         {"title": "Smart Cities Mission Reaches 2025 Milestone", "summary": "Over 95% of 8,000 sanctioned projects finalized. Integrated Command Centers now operational in 100 cities.", "source": "PIB India", "tag": "Policy"},
         {"title": "AMRUT 2.0: Circular Economy for Water Scaling", "summary": "New 'City Water Balance Plans' introduced to recycle treated sewage across tier-2 cities.", "source": "MoHUA", "tag": "Environment"},
         {"title": "Global Logistics Hub Breakthrough", "summary": "PM Gati Shakti National Master Plan integrates 10+ data layers for urban transport optimization.", "source": "Invest India", "tag": "Infrastructure"},
         {"title": "Industrial Smart Cities Approved", "summary": "Government greenlights 12 major hubs to boost manufacturing and regional jobs.", "source": "The Hindu", "tag": "Economy"}
-    ])
+    ]
+
+    if not GNEWS_API_KEY:
+        return jsonify(fallback_news)
+
+    try:
+        # Search for civic/municipal news from India
+        gnews_url = "https://gnews.io/api/v4/search"
+        params = {
+            "q": "municipal OR civic OR infrastructure OR smart city",
+            "lang": "en",
+            "country": "in",
+            "max": 6,
+            "apikey": GNEWS_API_KEY
+        }
+        res = requests.get(gnews_url, params=params, timeout=10)
+        res.raise_for_status()
+        articles = res.json().get("articles", [])
+
+        if not articles:
+            return jsonify(fallback_news)
+
+        # Tag mapping based on keywords in title/description
+        def detect_tag(title, desc):
+            text = (title + " " + desc).lower()
+            if any(k in text for k in ["water", "river", "pollution", "environment", "climate", "waste", "sewage"]):
+                return "Environment"
+            if any(k in text for k in ["road", "bridge", "metro", "transport", "highway", "infrastructure", "railway"]):
+                return "Infrastructure"
+            if any(k in text for k in ["policy", "government", "scheme", "bill", "law", "regulation", "budget"]):
+                return "Policy"
+            if any(k in text for k in ["economy", "gdp", "industry", "jobs", "employment", "investment", "trade"]):
+                return "Economy"
+            if any(k in text for k in ["health", "hospital", "medical", "disease"]):
+                return "Health"
+            if any(k in text for k in ["tech", "digital", "smart city", "ai", "app"]):
+                return "Technology"
+            return "Civic"
+
+        news_items = []
+        for article in articles:
+            title = article.get("title", "Untitled")
+            description = article.get("description", "")
+            source_name = article.get("source", {}).get("name", "News Source")
+            tag = detect_tag(title, description)
+            url = article.get("url", "")
+
+            news_items.append({
+                "title": title,
+                "summary": description[:200] + "..." if len(description) > 200 else description,
+                "source": source_name,
+                "tag": tag,
+                "url": url
+            })
+
+        return jsonify(news_items)
+
+    except Exception as e:
+        print(f"GNews API Error: {e}")
+        return jsonify(fallback_news)
 
 @app.route("/live-pulse")
 def live_pulse():
