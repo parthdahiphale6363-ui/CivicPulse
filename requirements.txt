@@ -18,3 +18,4 @@ langchain-groq
 langchain-postgres
 psycopg[binary]
 langchain-text-splitters
+fastembed

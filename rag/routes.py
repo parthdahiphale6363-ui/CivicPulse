@@ -4,7 +4,8 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, session
 from flask_wtf.csrf import validate_csrf
 
-from .service import ask
+import os
+from .service import ask, get_rag_status_info
 
 logger = logging.getLogger("civicpulse_rag")
 
@@ -17,6 +18,34 @@ def api_login_required(f):
     def decorated_function(*args, **kwargs):
         if "user_id" not in session:
             return jsonify({"error": "Authentication required. Please log in."}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+
+def api_admin_required(f):
+    """Decorator ensuring user is authenticated and has admin privileges."""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if "user_id" not in session:
+            return jsonify({"error": "Authentication required. Please log in."}), 401
+        if session.get("user_id") == 0 and session.get("role") == "admin":
+            return f(*args, **kwargs)
+
+        role = session.get("role")
+        if not role:
+            try:
+                import sqlite3
+                db_path = r"C:\data\database.db" if os.path.exists(r"C:\data\database.db") else "database.db"
+                with sqlite3.connect(db_path) as conn:
+                    conn.row_factory = sqlite3.Row
+                    cur = conn.cursor()
+                    row = cur.execute("SELECT role FROM users WHERE id=?", (session["user_id"],)).fetchone()
+                    if row:
+                        role = row["role"]
+            except Exception:
+                pass
+        if role != "admin":
+            return jsonify({"error": "Admin access required."}), 403
         return f(*args, **kwargs)
     return decorated_function
 
@@ -80,3 +109,18 @@ def rag_ask():
     except Exception as e:
         logger.error(f"Unhandled error in rag_ask: {e}")
         return jsonify({"error": "Failed to retrieve verified information."}), 500
+
+
+@rag_bp.route("/api/rag/status", methods=["GET"])
+@api_admin_required
+def rag_status():
+    """Return RAG operational status for monitoring.
+    Requires admin privileges. Never exposes secrets or database passwords.
+    """
+    try:
+        status_info = get_rag_status_info()
+        return jsonify(status_info), 200
+    except Exception as e:
+        logger.error(f"Unhandled error in rag_status: {e}")
+        return jsonify({"error": "Failed to retrieve RAG status."}), 500
+

@@ -40,3 +40,12 @@ scratch/
 .ingest.lock
 knowledge/_sources_cache/
 .archify/
+
+knowledge/rates/*.pdf
+rates_source/
+
+knowledge/rates/*.pdf
+rates_source/
+
+knowledge/rates/*.pdf
+rates_source/

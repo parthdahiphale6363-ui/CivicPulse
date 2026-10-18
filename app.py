@@ -56,14 +56,21 @@ MUNICIPAL_PROMPT_RULE = (
 import threading
 try:
     from rag import rag_bp
-    from rag.service import warm_up_rag, clean_ai_text, sanitize_ai_claims, CITY_CORPORATION_NAME, MUNICIPAL_PROMPT_RULE
+    from rag.service import is_rag_enabled, warm_up_rag, clean_ai_text, sanitize_ai_claims, CITY_CORPORATION_NAME, MUNICIPAL_PROMPT_RULE
     limiter.limit("20 per minute")(rag_bp)
     app.register_blueprint(rag_bp)
 
-    # Pre-warm RAG embeddings and vector store in a background daemon thread
-    threading.Thread(target=warm_up_rag, daemon=True).start()
+    # Pre-warm RAG embeddings and vector store in a background thread 45 seconds after boot only if RAG is enabled
+    if is_rag_enabled():
+        warmup_timer = threading.Timer(45.0, warm_up_rag)
+        warmup_timer.daemon = True
+        warmup_timer.start()
+    else:
+        app.logger.info("RAG is disabled via RAG_ENABLED != '1'. Warm-up thread not started.")
 except Exception as e:
     app.logger.error(f"Failed to initialize RAG module: {e}")
+    def is_rag_enabled():
+        return False
     def clean_ai_text(text):
         if not text:
             return text
