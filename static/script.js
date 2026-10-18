@@ -206,7 +206,7 @@ function sendChatMessage() {
         .then(res => res.json())
         .then(data => {
             removeTypingIndicator(typingId);
-            addChatMessage(data.response, 'ai');
+            addChatMessage(data.response, 'ai', data.sources);
             chatSendBtn.disabled = false;
 
             // Hide suggestions after first message
@@ -220,7 +220,7 @@ function sendChatMessage() {
         });
 }
 
-function addChatMessage(text, type) {
+function addChatMessage(text, type, sources) {
     const div = document.createElement('div');
     div.className = `chat-message ${type}`;
 
@@ -234,6 +234,42 @@ function addChatMessage(text, type) {
     // Format AI response with line breaks
     if (type === 'ai') {
         bubble.innerHTML = formatAIResponse(text);
+        if (sources && sources.length > 0) {
+            const sourcesDiv = document.createElement('div');
+            sourcesDiv.className = 'chat-sources';
+            sourcesDiv.style.marginTop = '8px';
+            sourcesDiv.style.paddingTop = '6px';
+            sourcesDiv.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+            sourcesDiv.style.fontSize = '11px';
+            sourcesDiv.style.color = '#94a3b8';
+            
+            const titleSpan = document.createElement('span');
+            titleSpan.innerHTML = '<i class="fas fa-book-open" style="color:#10b981"></i> Based on: ';
+            sourcesDiv.appendChild(titleSpan);
+
+            sources.forEach((s, idx) => {
+                const sName = s.title || s.source || 'KB';
+                if (s.source_url) {
+                    const a = document.createElement('a');
+                    a.href = s.source_url;
+                    a.target = '_blank';
+                    a.rel = 'noopener noreferrer';
+                    a.textContent = sName;
+                    a.style.color = '#38bdf8';
+                    a.style.marginLeft = '4px';
+                    sourcesDiv.appendChild(a);
+                } else {
+                    const span = document.createElement('span');
+                    span.textContent = sName;
+                    span.style.marginLeft = '4px';
+                    sourcesDiv.appendChild(span);
+                }
+                if (idx < sources.length - 1) {
+                    sourcesDiv.appendChild(document.createTextNode(' • '));
+                }
+            });
+            bubble.appendChild(sourcesDiv);
+        }
     } else {
         bubble.textContent = text;
     }
@@ -244,11 +280,22 @@ function addChatMessage(text, type) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+function escapeHTML(str) {
+    if (!str) return '';
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function formatAIResponse(text) {
     if (!text) return '';
-    // Convert markdown-like formatting to HTML
-    return text
-        .replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" class="chat-link">$1</a>')
+    // HTML-escape text first before converting markdown-like formatting to HTML
+    let escaped = escapeHTML(text);
+    return escaped
+        .replace(/\[(.*?)\]\(((?:https?:\/\/|\/)[^\s"'>]+)\)/g, '<a href="$2" class="chat-link" target="_blank" rel="noopener noreferrer">$1</a>')
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/\*(.*?)\*/g, '<em>$1</em>')
         .replace(/\n- /g, '<br>• ')

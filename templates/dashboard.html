@@ -371,12 +371,10 @@
         .then(r => r.json())
         .then(data => {
             if (data.insight) {
-                // Formatting the AI text nicely
-                const formatted = data.insight
-                    .replace(/\n\n/g, '<br><br>')
-                    .replace(/\d\.\s/g, '<strong>$&</strong>');
-                content.innerHTML = `<div class="reveal-fade">${formatted}</div>`;
+                content.style.whiteSpace = 'pre-line';
+                content.textContent = data.insight;
             } else {
+                content.style.whiteSpace = 'normal';
                 content.innerHTML = `<p style="color: var(--danger);">Unable to generate insight at this time.</p>`;
             }
         });

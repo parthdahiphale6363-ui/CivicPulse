@@ -496,12 +496,59 @@
             <div style="text-align: left;">
                 <h2 style="font-family: 'Space Grotesk'; font-size: 3rem; font-weight: 800;">${data.city.toUpperCase()}</h2>
                 <p style="color: rgba(255,255,255,0.7); max-width: 500px;">${data.summary}</p>
+                <div id="civic-iq-sources" style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.6); display: none;"></div>
             </div>
             <div style="text-align: center;">
                 <div class="health-grade-box" style="--grade-color: ${gradeColor}">${data.grade}</div>
                 <div style="margin-top: 15px; font-weight: 800; color: ${gradeColor}">CIVIC HEALTH: ${data.health_score}%</div>
             </div>
         `;
+
+        if (data.sources && data.sources.length > 0) {
+            const sourcesContainer = document.getElementById('civic-iq-sources');
+            if (sourcesContainer) {
+                sourcesContainer.style.display = 'block';
+
+                const icon = document.createElement('i');
+                icon.className = 'fas fa-book-open';
+                icon.style.color = 'var(--iq-success)';
+                sourcesContainer.appendChild(icon);
+
+                const label = document.createElement('b');
+                label.textContent = ' Based on: ';
+                label.style.marginLeft = '4px';
+                label.style.marginRight = '6px';
+                sourcesContainer.appendChild(label);
+
+                data.sources.forEach((s, idx) => {
+                    if (idx > 0) {
+                        const bullet = document.createTextNode(' • ');
+                        sourcesContainer.appendChild(bullet);
+                    }
+                    const titleText = s.title || 'Knowledge Base';
+                    const rawUrl = (s.source_url || '').trim();
+                    const isHttpUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
+
+                    if (isHttpUrl) {
+                        const a = document.createElement('a');
+                        a.setAttribute('href', rawUrl);
+                        a.setAttribute('target', '_blank');
+                        a.setAttribute('rel', 'noopener noreferrer');
+                        a.style.color = 'var(--iq-accent)';
+                        a.style.textDecoration = 'underline';
+                        a.style.marginRight = '8px';
+                        a.textContent = titleText;
+                        sourcesContainer.appendChild(a);
+                    } else {
+                        const span = document.createElement('span');
+                        span.style.color = 'rgba(255,255,255,0.6)';
+                        span.style.marginRight = '8px';
+                        span.textContent = titleText;
+                        sourcesContainer.appendChild(span);
+                    }
+                });
+            }
+        }
 
         const problemsList = document.getElementById('problems-list');
         problemsList.innerHTML = data.top_problems.map((p, i) => `

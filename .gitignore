@@ -32,3 +32,20 @@ Thumbs.db
 # Uploads
 static/uploads/*
 !static/uploads/.gitkeep
+
+# Scratch and test files
+scratch/
+
+# Ingest lock and sources cache
+.ingest.lock
+knowledge/_sources_cache/
+.archify/
+
+knowledge/rates/*.pdf
+rates_source/
+
+knowledge/rates/*.pdf
+rates_source/
+
+knowledge/rates/*.pdf
+rates_source/

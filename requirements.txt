@@ -11,3 +11,11 @@ Flask-SQLAlchemy>=3.0.0
 SQLAlchemy>=2.0.0
 psycopg2-binary>=2.9.0
 numpy
+langchain
+langchain-core
+langchain-community
+langchain-groq
+langchain-postgres
+psycopg[binary]
+langchain-text-splitters
+fastembed
