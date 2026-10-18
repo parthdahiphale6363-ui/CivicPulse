@@ -3301,3 +3301,15 @@ spline-viewer::part(logo) {
         display: none;
     }
 }
+
+/* Upvoted State */
+.btn.upvoted, .btn-outline.upvoted {
+    background: rgba(16, 185, 129, 0.12) !important;
+    border-color: var(--success) !important;
+    color: var(--success) !important;
+    cursor: default;
+    box-shadow: none;
+}
+.btn.upvoted i, .btn-outline.upvoted i {
+    color: var(--success) !important;
+}

@@ -273,14 +273,21 @@
 
             <!-- Actions -->
             <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
-                <button onclick="upvoteComplaint({{ complaint.id }}, this)" class="btn btn-outline btn-sm">
-                    <i class="fas fa-arrow-up"></i> Upvote <span class="upvote-count">{{ complaint.upvotes or 0 }}</span>
+                <button onclick="upvoteComplaint({{ complaint.id }}, this)" 
+                        class="btn btn-outline btn-sm {% if has_upvoted %}upvoted{% endif %}"
+                        {% if has_upvoted %}disabled title="You have already upvoted this complaint"{% endif %}>
+                    <i class="fas fa-arrow-up"></i> <span class="upvote-label">{% if has_upvoted %}Upvoted{% else %}Upvote{% endif %}</span> <span class="upvote-count">{{ complaint.upvotes or 0 }}</span>
                 </button>
-                <button onclick="markAffected({{ complaint.id }}, this)" class="btn btn-outline btn-sm" style="border-color: rgba(239, 68, 68, 0.4); color: var(--danger);">
-                    <i class="fas fa-fist-raised"></i> I'm Affected Too <span class="affected-count">({{ complaint.affected_count or 0 }})</span>
+                <button onclick="markAffected({{ complaint.id }}, this)" 
+                        class="btn btn-outline btn-sm" 
+                        style="border-color: rgba(239, 68, 68, 0.4); color: var(--danger); {% if has_affected %}background: rgba(239, 68, 68, 0.1);{% endif %}"
+                        {% if has_affected %}disabled title="You already marked this issue"{% endif %}>
+                    <i class="fas {% if has_affected %}fa-check{% else %}fa-fist-raised{% endif %}"></i> 
+                    {% if has_affected %}Marked as Affected{% else %}I'm Affected Too{% endif %} 
+                    <span class="affected-count">({{ complaint.affected_count or 0 }})</span>
                 </button>
-                <button onclick="subscribeNotify({{ complaint.id }}, this)" class="btn btn-outline btn-sm" style="border-color: rgba(16, 185, 129, 0.4); color: var(--success);">
-                    <i class="fas fa-bell"></i> Notify Me
+                <button onclick="subscribeNotify({{ complaint.id }}, this)" class="btn btn-outline btn-sm" style="border-color: rgba(16, 185, 129, 0.4); color: var(--success); {% if has_subscribed %}background: rgba(16, 185, 129, 0.1);{% endif %}" {% if has_subscribed %}disabled title="You are subscribed to notifications"{% endif %}>
+                    <i class="fas {% if has_subscribed %}fa-check{% else %}fa-bell{% endif %}"></i> {% if has_subscribed %}Subscribed{% else %}Notify Me{% endif %}
                 </button>
                 {% if complaint.status != 'Resolved' %}
                 <button id="amplifyBtn" onclick="generateCampaign({{ complaint.id }})" class="btn btn-primary btn-sm" style="background-color: #ec4899; border-color: #ec4899;">
@@ -400,40 +407,52 @@
             </h3>
             
             {% if logged_in %}
-            <form action="/api/complaint/{{ complaint.id }}/comment" method="POST" style="margin-bottom: 20px;">
-                <div style="display: flex; gap: 10px; align-items: flex-start;">
+            <form action="/api/complaint/{{ complaint.id }}/comment" method="POST" style="margin-bottom: 24px;">
+                <div style="display: flex; gap: 12px; align-items: flex-start;">
                     <div style="width: 40px; height: 40px; border-radius: 50%; background: var(--gradient-primary); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: white; flex-shrink: 0;">
                         {{ session.get('username', 'U')[0]|upper }}
                     </div>
                     <div style="flex: 1;">
-                        <textarea name="content" required placeholder="Add to the discussion..." rows="2" style="width: 100%; padding: 12px; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical; margin-bottom: 8px;"></textarea>
+                        <textarea name="content" required placeholder="Add your perspective or updates on this issue..." rows="2" style="width: 100%; padding: 12px; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 14px; font-family: 'Inter', sans-serif; resize: vertical; margin-bottom: 8px;"></textarea>
                         <button type="submit" class="btn btn-primary btn-sm" style="float: right;">Post Comment</button>
                     </div>
                 </div>
             </form>
             {% else %}
-            <div style="padding: 15px; text-align: center; background: #f8fafc; border-radius: var(--radius-sm); border: 1px solid var(--border); margin-bottom: 20px;">
-                <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 10px;">Please login to join the discussion.</p>
-                <a href="/login" class="btn btn-outline btn-sm">Login</a>
-            </div>
+            <form action="/api/complaint/{{ complaint.id }}/comment" method="POST" style="margin-bottom: 24px; background: #f8fafc; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-size: 13px; font-weight: 600; color: var(--text-primary);"><i class="fas fa-comment-dots" style="color: var(--primary-light);"></i> Join the Community Discussion</span>
+                    <a href="/login" style="font-size: 12px; color: var(--primary-light); text-decoration: none; font-weight: 500;">Or Log In to your account</a>
+                </div>
+                <div style="margin-bottom: 10px;">
+                    <input type="text" name="author_name" placeholder="Your Name (e.g. Concerned Citizen)" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 13px; background: #ffffff; color: var(--text-primary);">
+                </div>
+                <textarea name="content" required placeholder="Add your perspective or updates on this civic report..." rows="2" style="width: 100%; padding: 10px 12px; background: #ffffff; border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-size: 13px; font-family: 'Inter', sans-serif; resize: vertical; margin-bottom: 8px;"></textarea>
+                <button type="submit" class="btn btn-primary btn-sm" style="float: right;">Post Comment</button>
+                <div style="clear: both;"></div>
+            </form>
             {% endif %}
 
-            <div style="display: flex; flex-direction: column; gap: 15px;">
+            <div style="display: flex; flex-direction: column; gap: 14px;">
                 {% for comment in comments %}
                 <div style="display: flex; gap: 12px;">
                     <div style="width: 36px; height: 36px; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 14px; color: var(--primary); flex-shrink: 0;">
-                        {{ comment.fullname[0]|upper if comment.fullname else 'U' }}
+                        {{ comment.fullname[0]|upper if comment.fullname else 'C' }}
                     </div>
-                    <div style="flex: 1; background: #f8fafc; border-radius: var(--radius-md); padding: 12px 16px; border: 1px solid var(--border);">
+                    <div style="flex: 1; background: #ffffff; border-radius: var(--radius-md); padding: 12px 16px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.03);">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 6px; align-items: center;">
                             <div>
                                 <strong style="color: var(--text-primary); font-size: 14px;">{{ comment.fullname }}</strong>
+                                {% if comment.username and comment.username not in ['citizen', 'admin'] %}
                                 <span style="font-size: 12px; color: var(--text-muted); margin-left: 6px;">@{{ comment.username }}</span>
-                                {% if comment.trust_score and comment.trust_score > 150 %}
+                                {% endif %}
+                                {% if comment.user_role == 'admin' or comment.user_id == 0 %}
+                                <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #2563eb; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 6px;"><i class="fas fa-shield-alt"></i> Official / Admin</span>
+                                {% elif comment.trust_score and comment.trust_score > 150 %}
                                 <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: var(--success); font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 6px;"><i class="fas fa-medal"></i> Local Hero</span>
                                 {% endif %}
                             </div>
-                            <span style="font-size: 11px; color: var(--text-muted);">{{ comment.created_at[:16] }}</span>
+                            <span style="font-size: 11px; color: var(--text-muted);">{{ comment.created_at[:16] if comment.created_at else '' }}</span>
                         </div>
                         <p style="color: var(--text-primary); font-size: 14px; line-height: 1.5; margin: 0;">{{ comment.content }}</p>
                     </div>

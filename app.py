@@ -33,6 +33,10 @@ except ImportError:
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', os.urandom(24))
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+if os.environ.get('RENDER') or os.environ.get('PRODUCTION') or os.environ.get('DYNO'):
+    app.config['SESSION_COOKIE_SECURE'] = True
 
 # ---------------- RATE LIMITING ----------------
 limiter = Limiter(
@@ -124,17 +128,23 @@ app.logger.addHandler(handler)
 
 @app.errorhandler(404)
 def not_found_error(error):
-    app.logger.error(f'Page not found: {request.url}')
+    app.logger.warning(f'Page not found: {request.url}')
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Resource not found", "status": 404}), 404
     return "Not Found", 404
 
 @app.errorhandler(500)
 def internal_error(error):
     app.logger.error(f'Server Error: {error}')
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Internal server error", "status": 500}), 500
     return "Internal Server Error", 500
 
 @app.errorhandler(Exception)
 def unhandled_exception(e):
     app.logger.error(f'Unhandled Exception: {e}')
+    if request.path.startswith('/api/'):
+        return jsonify({"error": "Internal server error", "status": 500}), 500
     return "Internal Server Error", 500
 
 
@@ -205,8 +215,21 @@ def send_email_otp(target_email, otp_code):
 
 
 # ---------------- GROQ AI CONFIG ----------------
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_API_KEY_RAW = os.environ.get("GROQ_API_KEY", "")
+GROQ_API_KEYS = [k.strip() for k in GROQ_API_KEY_RAW.replace(";", ",").split(",") if k.strip()]
+GROQ_API_KEY = GROQ_API_KEYS[0] if GROQ_API_KEYS else ""
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+_groq_key_idx = 0
+
+def get_ordered_groq_keys():
+    """Round-robin load balancing across all available Groq API keys."""
+    global _groq_key_idx
+    if not GROQ_API_KEYS:
+        return []
+    n = len(GROQ_API_KEYS)
+    start = _groq_key_idx % n
+    _groq_key_idx = (_groq_key_idx + 1) % n
+    return GROQ_API_KEYS[start:] + GROQ_API_KEYS[:start]
 
 def strip_think_tags(text):
     """Strip <think>...</think> reasoning blocks that Qwen models add to responses."""
@@ -215,90 +238,93 @@ def strip_think_tags(text):
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
     return cleaned if cleaned else text
 
-# Retry config for Groq rate limits
-MAX_RETRIES = 5
-BASE_BACKOFF_SECONDS = 3
-
-def ask_groq(prompt, system_message="You are a helpful assistant."):
-    """Send a prompt to Groq AI and return the response text."""
-    if not GROQ_API_KEY:
+def ask_groq(prompt, system_message="You are a helpful assistant.", max_tokens=512):
+    """Send a prompt to Groq AI with multi-key round-robin and non-blocking backoff."""
+    keys_to_try = get_ordered_groq_keys()
+    if not keys_to_try:
         return "AI service not configured. Please set GROQ_API_KEY environment variable."
         
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    data = {
+    payload = {
         "model": "qwen/qwen3.8-27b",
         "messages": [
             {"role": "system", "content": system_message},
             {"role": "user", "content": prompt}
         ],
         "temperature": 0.7,
-        "max_tokens": 1024
+        "max_tokens": max_tokens
     }
-    
-    last_error = None
+
     import time
-    for attempt in range(MAX_RETRIES + 1):
+    for idx, key in enumerate(keys_to_try):
+        headers = {
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json"
+        }
         try:
-            response = requests.post(GROQ_API_URL, headers=headers, json=data, timeout=30)
-            
-            # Handle 429 rate limit with retry
-            if response.status_code == 429:
-                retry_after = response.headers.get("Retry-After")
-                if retry_after:
-                    wait = float(retry_after)
-                else:
-                    wait = BASE_BACKOFF_SECONDS * (2 ** attempt)
-                wait = max(wait, 5.0)
-                print(f"GROQ: Rate limited (429). Retrying in {wait}s (attempt {attempt + 1}/{MAX_RETRIES + 1})")
-                if attempt < MAX_RETRIES:
-                    time.sleep(wait)
+            resp = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=20)
+            if resp.status_code == 200:
+                raw = resp.json()["choices"][0]["message"]["content"]
+                return strip_think_tags(raw)
+
+            if resp.status_code == 429:
+                # If we have alternative keys, fail over immediately with 0 delay!
+                if len(keys_to_try) > 1 and idx < len(keys_to_try) - 1:
+                    print(f"GROQ: Key {idx + 1} hit rate limit (429). Instantly switching to backup key...")
                     continue
-                else:
-                    response.raise_for_status()  # Final attempt
-                    
-            if response.status_code != 200:
-                return None
                 
-            raw = response.json()["choices"][0]["message"]["content"]
-            return strip_think_tags(raw)
-        except Exception as e:
-            last_error = e
-            if response is not None and response.status_code == 429 and attempt < MAX_RETRIES:
-                continue
-            print(f"GROQ ERROR: {str(e)}")
+                # Single key or last key: do a fast, single backoff (max 3 seconds)
+                retry_after = resp.headers.get("Retry-After")
+                wait = min(float(retry_after) if retry_after else 2.0, 3.0)
+                print(f"GROQ: Rate limit (429). Brief pause {wait}s before final attempt...")
+                time.sleep(wait)
+                
+                resp2 = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=20)
+                if resp2.status_code == 200:
+                    raw = resp2.json()["choices"][0]["message"]["content"]
+                    return strip_think_tags(raw)
+                else:
+                    print(f"GROQ: Rate limit still active. Yielding to local fallback.")
+                    return None
+
+            print(f"GROQ HTTP {resp.status_code}: {resp.text[:120]}")
             return None
-            
-    print(f"GROQ ERROR: All {MAX_RETRIES + 1} attempts failed. Last error: {last_error}")
+
+        except Exception as e:
+            print(f"GROQ Request Error: {e}")
+            continue
+
     return None
 
 
 def transcribe_audio(file_path):
-    """Transcribe audio file using Groq's Whisper model."""
-    if not GROQ_API_KEY:
+    """Transcribe audio file using Groq's Whisper model with multi-key failover."""
+    keys = get_ordered_groq_keys()
+    if not keys:
         return None
-    try:
-        url = "https://api.groq.com/openai/v1/audio/transcriptions"
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}"
-        }
-        with open(file_path, "rb") as f:
-            files = {
-                "file": (os.path.basename(file_path), f),
-                "model": (None, "whisper-large-v3"),
-                "response_format": (None, "json")
-            }
-            response = requests.post(url, headers=headers, files=files, timeout=30)
-        
-        if response.status_code != 200:
-            print(f"TRANSCRIPTION ERROR: {response.status_code} - {response.text}")
-            return None
-        return response.json().get("text")
-    except Exception as e:
-        print(f"TRANSCRIPTION EXCEPTION: {str(e)}")
-        return None
+    url = "https://api.groq.com/openai/v1/audio/transcriptions"
+    for key in keys:
+        try:
+            headers = {"Authorization": f"Bearer {key}"}
+            with open(file_path, "rb") as f:
+                files = {
+                    "file": (os.path.basename(file_path), f),
+                    "model": (None, "whisper-large-v3"),
+                    "response_format": (None, "json")
+                }
+                response = requests.post(url, headers=headers, files=files, timeout=30)
+            
+            if response.status_code == 200:
+                return response.json().get("text")
+            elif response.status_code == 429:
+                print(f"WHISPER: Rate limit hit on key. Trying next key...")
+                continue
+            else:
+                print(f"TRANSCRIPTION ERROR: {response.status_code} - {response.text}")
+                return None
+        except Exception as e:
+            print(f"TRANSCRIPTION EXCEPTION: {str(e)}")
+            continue
+    return None
 
 @app.route("/api/voice-report", methods=["POST"])
 @limiter.limit("10 per minute")
@@ -319,7 +345,7 @@ def voice_report():
     if not transcript:
         return jsonify({"error": "Transcription failed. Please try again or type."})
         
-    # 2. Structure using LLM
+    # 2. Structure using LLM with compact token limit
     prompt = f"""Transcript from citizen voice note: "{transcript}"
 Analyze this and return ONLY a JSON object:
 {{
@@ -329,9 +355,36 @@ Analyze this and return ONLY a JSON object:
   "native_transcript": "{transcript}"
 }}"""
     
-    structured_raw = ask_groq(prompt, "You are a civic data structuring AI. Return only JSON.")
+    structured_raw = ask_groq(prompt, "You are a civic data structuring AI. Return only JSON.", max_tokens=250)
+    
+    # Helper for instant keyword fallback if LLM is rate-limited
+    def fallback_structure(text):
+        t = text.lower()
+        if any(w in t for w in ["pothole", "crater", "khadda", "road damage", "hole"]):
+            cat, pri = "Pothole", "High"
+        elif any(w in t for w in ["garbage", "trash", "waste", "kachra", "dump", "dustbin"]):
+            cat, pri = "Garbage", "Medium"
+        elif any(w in t for w in ["leak", "pipe", "water supply", "paani", "broken pipe"]):
+            cat, pri = "Water Leakage", "High"
+        elif any(w in t for w in ["sewage", "gutter", "drain", "manhole", "overflow", "naala"]):
+            cat, pri = "Sewage", "High"
+        elif any(w in t for w in ["light", "dark", "lamp", "pole", "bulb", "streetlight"]):
+            cat, pri = "Streetlight", "Medium"
+        elif any(w in t for w in ["traffic", "signal", "jam", "choke"]):
+            cat, pri = "Traffic Signal", "High"
+        elif any(w in t for w in ["noise", "loudspeaker", "dj", "sound", "music"]):
+            cat, pri = "Noise Pollution", "Low"
+        else:
+            cat, pri = "Other", "Medium"
+        return {
+            "category": cat,
+            "clean_description": text.strip(),
+            "priority": pri,
+            "native_transcript": text.strip()
+        }
+
     if not structured_raw:
-        return jsonify({"error": "AI structuring failed."})
+        return jsonify(fallback_structure(transcript))
         
     try:
         clean_json = structured_raw.strip()
@@ -339,12 +392,7 @@ Analyze this and return ONLY a JSON object:
         data = json.loads(clean_json)
         return jsonify(data)
     except:
-        return jsonify({
-            "category": "Other",
-            "clean_description": transcript,
-            "priority": "Medium",
-            "native_transcript": transcript
-        })
+        return jsonify(fallback_structure(transcript))
 
 def ask_groq_vision(base64_image, prompt="Analyze this image."):
     """True Multimodal Image Validation using LLaMA 3.2 Vision on Groq."""
@@ -368,11 +416,10 @@ def ask_groq_vision(base64_image, prompt="Analyze this image."):
         elif img_bytes[:4] == b'RIFF':
             img_type = "webp"
             
-        headers = {
-            "Authorization": f"Bearer {GROQ_API_KEY}",
-            "Content-Type": "application/json"
-        }
-        
+        keys = get_ordered_groq_keys()
+        if not keys:
+            return None
+
         data = {
             "model": "qwen/qwen3.8-27b",
             "messages": [
@@ -390,16 +437,26 @@ def ask_groq_vision(base64_image, prompt="Analyze this image."):
                 }
             ],
             "temperature": 0.2,
-            "max_tokens": 1024
+            "max_tokens": 512
         }
         
-        response = requests.post(GROQ_API_URL, headers=headers, json=data, timeout=30)
-        if response.status_code != 200:
-            print(f"GROQ VISION ERROR: {response.status_code} - {response.text}")
-            return None
-            
-        raw = response.json()["choices"][0]["message"]["content"]
-        return strip_think_tags(raw)
+        for key in keys:
+            headers = {
+                "Authorization": f"Bearer {key}",
+                "Content-Type": "application/json"
+            }
+            response = requests.post(GROQ_API_URL, headers=headers, json=data, timeout=30)
+            if response.status_code == 200:
+                raw = response.json()["choices"][0]["message"]["content"]
+                return strip_think_tags(raw)
+            elif response.status_code == 429:
+                print("GROQ VISION: Rate limit hit. Trying next key...")
+                continue
+            else:
+                print(f"GROQ VISION ERROR: {response.status_code} - {response.text[:100]}")
+                return None
+                
+        return None
         
     except Exception as e:
         print(f"GROQ VISION FATAL ERROR: {str(e)}")
@@ -414,7 +471,7 @@ csrf = CSRFProtect(app)
 @app.before_request
 def manual_csrf_check():
     if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
-        if request.path.startswith('/api/') or request.path.startswith('/live-pulse'):
+        if request.path.startswith('/api/') or request.path.startswith('/live-pulse') or request.path.startswith('/upvote/'):
             return
         from flask_wtf.csrf import validate_csrf
         try:
@@ -424,6 +481,11 @@ def manual_csrf_check():
 
 @app.after_request
 def inject_csrf_token(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'public, max-age=3600'
     if response.content_type and 'text/html' in response.content_type:
         html = response.get_data(as_text=True)
         if '<form' in html.lower():
@@ -444,6 +506,15 @@ elif _db_url.startswith("postgresql://"):
     _db_url = _db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
 app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+
+engine_options = {"pool_pre_ping": True}
+if _db_url.startswith("postgresql"):
+    engine_options.update({
+        "pool_recycle": 300,
+        "pool_size": 5,
+        "max_overflow": 10
+    })
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = engine_options
 db = SQLAlchemy(app)
 
 class DBConnectionWrapper:
@@ -609,10 +680,21 @@ def create_table():
         CREATE TABLE IF NOT EXISTS comments (
             id {pk_col()},
             complaint_id INTEGER,
-            user_id INTEGER,
+            user_id INTEGER DEFAULT 0,
+            author_name TEXT DEFAULT '',
             parent_id INTEGER DEFAULT NULL,
             content TEXT,
             created_at TEXT
+        )
+    """)
+
+    conn.execute(f"""
+        CREATE TABLE IF NOT EXISTS complaint_upvotes (
+            id {pk_col()},
+            complaint_id INTEGER,
+            user_id INTEGER,
+            created_at TEXT,
+            UNIQUE(complaint_id, user_id)
         )
     """)
 
@@ -681,6 +763,8 @@ def create_table():
         ("users", "trust_score", "INTEGER DEFAULT 100"),
         ("users", "streak_days", "INTEGER DEFAULT 0"),
         ("users", "last_active_date", "TEXT DEFAULT ''"),
+        ("comments", "author_name", "TEXT DEFAULT ''"),
+        ("comments", "user_id", "INTEGER DEFAULT 0"),
     ]
     for table, column, col_type in migrations:
         try:
@@ -1735,20 +1819,60 @@ def resolve(id):
     return redirect("/complaints")
 
 
-# Upvote complaint (Modifies trust score too)
-@app.route("/upvote/<int:id>")
+# Upvote complaint (1 member can upvote only once)
+@app.route("/upvote/<int:id>", methods=["GET", "POST"])
 def upvote(id):
+    if 'user_id' not in session:
+        return jsonify({
+            "success": False,
+            "requires_login": True,
+            "message": "Please log in to upvote."
+        }), 401
+
+    user_id = session['user_id']
     conn = get_db_connection()
-    conn.execute("UPDATE complaints SET upvotes = upvotes + 1 WHERE id=?", (id,))
     
-    # Increase trust score for author
-    complaint = conn.execute("SELECT user_id FROM complaints WHERE id=?", (id,)).fetchone()
-    if complaint and complaint['user_id']:
-        conn.execute("UPDATE users SET trust_score = trust_score + 2 WHERE id=?", (complaint['user_id'],))
+    # 1 member can upvote only once
+    try:
+        existing = conn.execute(
+            "SELECT id FROM complaint_upvotes WHERE complaint_id=? AND user_id=?",
+            (id, user_id)
+        ).fetchone()
         
-    conn.commit()
-    conn.close()
-    return jsonify({"success": True})
+        if existing:
+            c = conn.execute("SELECT upvotes FROM complaints WHERE id=?", (id,)).fetchone()
+            current_upvotes = c['upvotes'] if c else 0
+            conn.close()
+            return jsonify({
+                "success": False,
+                "already_upvoted": True,
+                "upvotes": current_upvotes,
+                "message": "You have already upvoted this complaint."
+            })
+            
+        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute(
+            "INSERT INTO complaint_upvotes (complaint_id, user_id, created_at) VALUES (?, ?, ?)",
+            (id, user_id, created_at)
+        )
+        conn.execute("UPDATE complaints SET upvotes = upvotes + 1 WHERE id=?", (id,))
+        
+        # Increase trust score for author
+        complaint = conn.execute("SELECT user_id, upvotes FROM complaints WHERE id=?", (id,)).fetchone()
+        if complaint and complaint['user_id']:
+            conn.execute("UPDATE users SET trust_score = trust_score + 2 WHERE id=?", (complaint['user_id'],))
+            
+        conn.commit()
+        new_count = complaint['upvotes'] if complaint else 1
+        conn.close()
+        return jsonify({
+            "success": True,
+            "upvotes": new_count,
+            "message": "Upvoted successfully!"
+        })
+    except Exception as e:
+        conn.close()
+        return jsonify({"success": False, "message": "Failed to record upvote."}), 500
 
 
 # Delete complaint
@@ -1772,35 +1896,66 @@ def view_complaint(id):
     # Get feedback for this complaint
     try:
         feedbacks = conn.execute("SELECT * FROM feedback WHERE complaint_id=? ORDER BY id DESC", (id,)).fetchall()
-    except:
+    except Exception:
         feedbacks = []
 
-    # Get comments
+    # Get comments for all users (stored & visible to everyone)
     try:
         comments = conn.execute("""
-            SELECT c.*, u.fullname, u.username, u.trust_score 
+            SELECT c.*, 
+                   COALESCE(NULLIF(c.author_name, ''), u.fullname, CASE WHEN c.user_id = 0 THEN 'Admin' ELSE 'Citizen' END) as fullname, 
+                   COALESCE(u.username, CASE WHEN c.user_id = 0 THEN 'admin' ELSE 'citizen' END) as username, 
+                   COALESCE(u.trust_score, 100) as trust_score,
+                   COALESCE(u.role, CASE WHEN c.user_id = 0 THEN 'admin' ELSE 'user' END) as user_role
             FROM comments c 
-            JOIN users u ON c.user_id = u.id 
+            LEFT JOIN users u ON c.user_id = u.id 
             WHERE c.complaint_id=? ORDER BY c.created_at ASC
         """, (id,)).fetchall()
-    except:
+    except Exception as e:
         comments = []
 
     # Get timeline
     try:
         timeline = conn.execute("SELECT * FROM issue_timeline WHERE complaint_id=? ORDER BY created_at ASC", (id,)).fetchall()
-    except:
+    except Exception:
         timeline = []
+
+    # Track member actions for one-time buttons
+    has_upvoted = False
+    has_affected = False
+    has_subscribed = False
+    if 'user_id' in session:
+        uid = session['user_id']
+        try:
+            has_upvoted = bool(conn.execute("SELECT 1 FROM complaint_upvotes WHERE complaint_id=? AND user_id=?", (id, uid)).fetchone())
+        except Exception:
+            pass
+        try:
+            has_affected = bool(conn.execute("SELECT 1 FROM issue_affected WHERE complaint_id=? AND user_id=?", (id, uid)).fetchone())
+        except Exception:
+            pass
+        try:
+            has_subscribed = bool(conn.execute("SELECT 1 FROM complaint_subscribers WHERE complaint_id=? AND user_id=?", (id, uid)).fetchone())
+        except Exception:
+            pass
 
     conn.close()
     if not complaint:
         flash('Complaint not found.', 'danger')
         return redirect("/complaints")
-    return render_template("complaint_detail.html", complaint=complaint, feedbacks=feedbacks, comments=comments, timeline=timeline)
+    return render_template(
+        "complaint_detail.html", 
+        complaint=complaint, 
+        feedbacks=feedbacks, 
+        comments=comments, 
+        timeline=timeline,
+        has_upvoted=has_upvoted,
+        has_affected=has_affected,
+        has_subscribed=has_subscribed
+    )
 
 # ======== NEW COMMUNITY BOARD ROUTES ========
 @app.route("/api/complaint/<int:id>/comment", methods=["POST"])
-@login_required
 def add_comment(id):
     content = request.form.get("content", "").strip()
     if not content:
@@ -1809,12 +1964,37 @@ def add_comment(id):
     
     # Store comment
     created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    user_id = session.get('user_id', 0)
+    
+    if user_id == 0 and session.get('role') == 'admin':
+        author_name = 'Admin'
+    elif user_id != 0 and session.get('username'):
+        author_name = session.get('username')
+    else:
+        author_name = request.form.get("author_name", "").strip() or "Citizen"
+
     conn = get_db_connection()
-    conn.execute("INSERT INTO comments (complaint_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
-                 (id, session['user_id'], content, created_at))
-    conn.commit()
-    conn.close()
-    flash("Comment added successfully!", "success")
+    try:
+        conn.execute(
+            "INSERT INTO comments (complaint_id, user_id, author_name, content, created_at) VALUES (?, ?, ?, ?, ?)",
+            (id, user_id, author_name, content, created_at)
+        )
+        conn.commit()
+        flash("Comment added successfully!", "success")
+    except Exception:
+        # Fallback if author_name column was not added yet
+        try:
+            conn.execute(
+                "INSERT INTO comments (complaint_id, user_id, content, created_at) VALUES (?, ?, ?, ?)",
+                (id, user_id, content, created_at)
+            )
+            conn.commit()
+            flash("Comment added successfully!", "success")
+        except Exception:
+            flash("Failed to add comment. Please try again.", "danger")
+    finally:
+        conn.close()
+        
     return redirect(f"/complaint/{id}")
 
 @app.route("/api/complaint/<int:id>/affected", methods=["POST"])
@@ -2426,13 +2606,32 @@ def community():
         LIMIT 5
     """).fetchall()
 
+    # Live Community Comments & Discussions across all reports
+    try:
+        recent_comments = conn.execute("""
+            SELECT c.id, c.complaint_id, c.content, c.created_at, c.user_id,
+                   COALESCE(NULLIF(c.author_name, ''), u.fullname, CASE WHEN c.user_id = 0 THEN 'Admin' ELSE 'Citizen' END) as fullname,
+                   COALESCE(u.username, CASE WHEN c.user_id = 0 THEN 'admin' ELSE 'citizen' END) as username,
+                   COALESCE(u.trust_score, 100) as trust_score,
+                   COALESCE(u.role, CASE WHEN c.user_id = 0 THEN 'admin' ELSE 'user' END) as user_role,
+                   comp.category, comp.description as complaint_desc
+            FROM comments c
+            LEFT JOIN users u ON c.user_id = u.id
+            LEFT JOIN complaints comp ON c.complaint_id = comp.id
+            ORDER BY c.created_at DESC
+            LIMIT 6
+        """).fetchall()
+    except Exception:
+        recent_comments = []
+
     conn.close()
     return render_template("community.html", 
                            announcements=announcements, 
                            top_complaints=top_complaints,
                            latest_summary=latest_summary,
                            resolved_feed=resolved_feed,
-                           dept_leaderboard=dept_leaderboard)
+                           dept_leaderboard=dept_leaderboard,
+                           recent_comments=recent_comments)
 
 @app.route("/admin/generate-weekly-summary", methods=["POST"])
 @admin_required

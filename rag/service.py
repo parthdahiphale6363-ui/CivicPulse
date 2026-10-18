@@ -184,14 +184,21 @@ def get_vectorstore():
         return None
 
 
+def get_groq_api_keys() -> List[str]:
+    """Parse all available Groq API keys from environment (supports comma-separated list)."""
+    raw = os.environ.get("GROQ_API_KEY", "")
+    return [k.strip() for k in raw.replace(";", ",").split(",") if k.strip()]
+
+
 @lru_cache(maxsize=1)
 def get_groq_llm():
     """Lazily load ChatGroq LLM (used when RAG_BACKEND='langchain')."""
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
+    keys = get_groq_api_keys()
+    if not keys:
         logger.debug("GROQ_API_KEY not set.")
         return None
 
+    api_key = keys[0]
     model_name = os.environ.get("GROQ_RAG_MODEL", "qwen/qwen3.8-27b")
     try:
         from langchain_groq import ChatGroq
@@ -213,8 +220,8 @@ def rewrite_query(message: str, history: Optional[List[Dict[str, str]]] = None) 
     if not message or not message.strip():
         return ""
 
-    api_key = os.environ.get("GROQ_API_KEY")
-    if not api_key:
+    keys = get_groq_api_keys()
+    if not keys:
         return message
 
     try:
@@ -239,20 +246,27 @@ def rewrite_query(message: str, history: Optional[List[Dict[str, str]]] = None) 
         prompt_text += f"User message: {message}\nStandalone English query:"
 
         import requests
-        resp = requests.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-            json={
-                "model": os.environ.get("GROQ_RAG_MODEL", "qwen/qwen3.8-27b"),
-                "messages": [{"role": "user", "content": prompt_text}],
-                "temperature": 0.1,
-                "max_tokens": 60
-            },
-            timeout=3.0
-        )
-        if resp.status_code == 200:
-            query = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
-            return query if query else message
+        model_name = os.environ.get("GROQ_RAG_MODEL", "qwen/qwen3.8-27b")
+        for key in keys:
+            try:
+                resp = requests.post(
+                    "https://api.groq.com/openai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                    json={
+                        "model": model_name,
+                        "messages": [{"role": "user", "content": prompt_text}],
+                        "temperature": 0.1,
+                        "max_tokens": 60
+                    },
+                    timeout=3.0
+                )
+                if resp.status_code == 200:
+                    query = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
+                    return query if query else message
+                elif resp.status_code == 429:
+                    continue
+            except Exception:
+                continue
         return message
     except Exception as e:
         logger.debug(f"Query rewrite skipped/failed: {e}")
@@ -503,8 +517,8 @@ def ask(question: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[s
                 "sources": []
             }
 
-        api_key = os.environ.get("GROQ_API_KEY")
-        if not api_key:
+        keys = get_groq_api_keys()
+        if not keys:
             return {
                 "answer": "AI service is currently unavailable.",
                 "sources": sources
@@ -536,23 +550,31 @@ def ask(question: str, history: Optional[List[Dict[str, str]]] = None) -> Dict[s
         else:
             import requests
             model_name = os.environ.get("GROQ_RAG_MODEL", "qwen/qwen3.8-27b")
-            resp = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": model_name,
-                    "messages": [
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": question}
-                    ],
-                    "temperature": 0.1,
-                    "max_tokens": 500
-                },
-                timeout=15.0
-            )
-            if resp.status_code == 200:
-                raw_answer = resp.json()["choices"][0]["message"]["content"]
-            else:
+            raw_answer = None
+            for key in keys:
+                try:
+                    resp = requests.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                        json={
+                            "model": model_name,
+                            "messages": [
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": question}
+                            ],
+                            "temperature": 0.1,
+                            "max_tokens": 500
+                        },
+                        timeout=15.0
+                    )
+                    if resp.status_code == 200:
+                        raw_answer = resp.json()["choices"][0]["message"]["content"]
+                        break
+                    elif resp.status_code == 429:
+                        continue
+                except Exception:
+                    continue
+            if not raw_answer:
                 raw_answer = "No verified information found."
 
         answer = sanitize_ai_claims(raw_answer.strip(), context_text)

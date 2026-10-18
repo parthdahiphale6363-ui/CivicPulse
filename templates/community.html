@@ -89,6 +89,63 @@
             <p>Upvote complaints to help prioritize the most important issues!</p>
         </div>
         {% endif %}
+    </div>
+
+    <!-- Live Community Discussions (Report Comments) -->
+    <div style="margin-top: 48px; margin-bottom: 48px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h3 style="font-size: 20px; font-weight: 700; margin: 0; display: flex; align-items: center; gap: 10px;" class="reveal">
+                <i class="fas fa-comments" style="color: var(--primary-light);"></i> Live Community Discussions
+                <span style="font-size: 12px; color: var(--text-muted); font-weight: 400;">Recent comments on civic reports</span>
+            </h3>
+        </div>
+
+        {% if recent_comments %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px;">
+            {% for rc in recent_comments %}
+            <div class="glass reveal" style="padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; background: #ffffff;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="width: 32px; height: 32px; border-radius: 50%; background: var(--bg-secondary); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 13px; color: var(--primary);">
+                                {{ rc.fullname[0]|upper if rc.fullname else 'C' }}
+                            </div>
+                            <div>
+                                <strong style="font-size: 13px; color: var(--text-primary);">{{ rc.fullname }}</strong>
+                                {% if rc.user_role == 'admin' or rc.user_id == 0 %}
+                                <span class="badge" style="background: rgba(59, 130, 246, 0.15); color: #2563eb; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px;"><i class="fas fa-shield-alt"></i> Official</span>
+                                {% elif rc.trust_score and rc.trust_score > 150 %}
+                                <span class="badge" style="background: rgba(16, 185, 129, 0.2); color: var(--success); font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 4px;"><i class="fas fa-medal"></i> Local Hero</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <span style="font-size: 11px; color: var(--text-muted);">{{ rc.created_at[:16] if rc.created_at else '' }}</span>
+                    </div>
+
+                    <p style="color: var(--text-primary); font-size: 13.5px; line-height: 1.5; margin: 0 0 12px 0;">
+                        "{{ rc.content }}"
+                    </p>
+                </div>
+
+                <div style="border-top: 1px dashed var(--border); padding-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <a href="/complaint/{{ rc.complaint_id }}" style="font-size: 12px; color: var(--primary-light); text-decoration: none; display: flex; align-items: center; gap: 5px; max-width: 80%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        <i class="fas fa-link"></i>
+                        <span>On: {{ rc.category }}: {{ rc.complaint_desc[:40] if rc.complaint_desc else 'Report #' ~ rc.complaint_id }}...</span>
+                    </a>
+                    <a href="/complaint/{{ rc.complaint_id }}" class="btn btn-outline btn-sm" style="padding: 2px 8px; font-size: 11px;">View</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state reveal" style="padding: 24px;">
+            <i class="fas fa-comments"></i>
+            <h4 style="font-size: 15px; margin-bottom: 4px;">No Community Comments Yet</h4>
+            <p style="font-size: 13px; color: var(--text-muted);">Be the first to share your thoughts on any active civic complaint!</p>
+        </div>
+        {% endif %}
+    </div>
+
     <!-- Transparency Phase: Resolved Feed & Leaderboard -->
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 30px; margin-top: 50px;">
         <!-- Resolved Celebration Feed -->

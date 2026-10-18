@@ -127,21 +127,48 @@ function animateCounters() {
 
 document.addEventListener('DOMContentLoaded', animateCounters);
 
-// ---------- Upvote Handler ----------
+// ---------- Upvote Handler (1 member can upvote only once) ----------
 function upvoteComplaint(id, btn) {
+    if (!btn || btn.disabled) return;
+    
     fetch(`/upvote/${id}`)
-        .then(res => res.json())
-        .then(data => {
+        .then(res => res.json().then(data => ({ status: res.status, data })))
+        .then(({ status, data }) => {
+            const countEl = btn.querySelector('.upvote-count');
+            const labelEl = btn.querySelector('.upvote-label');
+            
             if (data.success) {
-                const countEl = btn.querySelector('.upvote-count');
                 if (countEl) {
-                    countEl.textContent = parseInt(countEl.textContent) + 1;
+                    countEl.textContent = data.upvotes !== undefined ? data.upvotes : (parseInt(countEl.textContent || '0') + 1);
+                }
+                if (labelEl) {
+                    labelEl.textContent = 'Upvoted';
                 }
                 btn.classList.add('upvoted');
                 btn.disabled = true;
+                btn.title = "You have already upvoted this complaint";
+            } else if (data.requires_login || status === 401) {
+                alert("Please log in to upvote complaints.");
+                window.location.href = "/login";
+            } else if (data.already_upvoted) {
+                alert(data.message || "You have already upvoted this complaint.");
+                if (countEl && data.upvotes !== undefined) {
+                    countEl.textContent = data.upvotes;
+                }
+                if (labelEl) {
+                    labelEl.textContent = 'Upvoted';
+                }
+                btn.classList.add('upvoted');
+                btn.disabled = true;
+                btn.title = "You have already upvoted this complaint";
+            } else {
+                alert(data.message || "Could not process upvote.");
             }
         })
-        .catch(err => console.error('Upvote failed:', err));
+        .catch(err => {
+            console.error('Upvote failed:', err);
+            alert("Network error while upvoting. Please try again.");
+        });
 }
 
 // ---------- Smooth Scroll for Anchor Links ----------
