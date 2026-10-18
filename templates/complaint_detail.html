@@ -218,7 +218,7 @@
                     <i class="fas fa-robot" style="color: var(--accent);"></i> AI Analysis
                     <span class="ai-badge"><i class="fas fa-sparkles"></i> Groq AI</span>
                 </h3>
-                <div class="ai-text" style="background: rgba(6, 182, 212, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(6, 182, 212, 0.1);">
+                <div class="ai-text" style="background: rgba(6, 182, 212, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(6, 182, 212, 0.1); white-space: pre-line;">
                     {{ complaint.ai_analysis }}
                 </div>
             </div>
@@ -231,7 +231,7 @@
                     <i class="fas fa-lightbulb" style="color: var(--warning);"></i> AI Resolution Suggestion
                     <span class="ai-badge"><i class="fas fa-sparkles"></i> Groq AI</span>
                 </h3>
-                <div class="ai-text" style="background: rgba(245, 158, 11, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.1);">
+                <div class="ai-text" style="background: rgba(245, 158, 11, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(245, 158, 11, 0.1); white-space: pre-line;">
                     {{ complaint.ai_suggestion }}
                 </div>
             </div>
@@ -255,7 +255,7 @@
                     {% endif %}
                 </div>
                 
-                <div id="aiAnalysis" class="ai-text" style="background: rgba(99, 102, 241, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.1); display: none; margin-bottom: 15px;"></div>
+                <div id="aiAnalysis" class="ai-text" style="background: rgba(99, 102, 241, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px solid rgba(99, 102, 241, 0.1); display: none; margin-bottom: 15px; white-space: pre-line;"></div>
                 
                 <div id="rippleContainer" class="ai-text" style="background: rgba(239, 68, 68, 0.05); padding: 16px; border-radius: var(--radius-md); border: 1px dashed rgba(239, 68, 68, 0.3); display: none; margin-bottom: 15px;">
                     <h4 style="color: var(--danger); margin-bottom: 10px; font-size: 14px;"><i class="fas fa-exclamation-triangle"></i> Domino Effect Warning (If ignored for 7 days)</h4>
@@ -644,11 +644,11 @@ function runDeepAnalysis(id) {
     fetch(`/api/analyze/${id}`)
         .then(res => res.json())
         .then(data => {
-            container.innerHTML = data.analysis.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            container.textContent = data.analysis;
             btn.innerHTML = '<i class="fas fa-brain"></i> Analysis Complete';
         })
         .catch(() => {
-            container.innerHTML = 'Unable to analyze. Try again later.';
+            container.textContent = 'Unable to analyze. Try again later.';
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-brain"></i> Retry Analysis';
         });
@@ -672,13 +672,17 @@ function forecastRippleEffect(id) {
             data.effects.forEach(e => {
                 let li = document.createElement('li');
                 li.style.marginBottom = '6px';
-                // Highlight words like Immediate, Secondary, Long-Term
-                li.innerHTML = e.replace(/(Immediate|Secondary|Long-Term|1\\.|2\\.|3\\.)/i, '<strong style="color: var(--text-primary);">$1</strong>');
+                li.textContent = e;
                 list.appendChild(li);
             });
             btn.innerHTML = '<i class="fas fa-wind"></i> Forecast Complete';
         } else {
-            list.innerHTML = `<li style="color: var(--danger); list-style: none;">${data.error}</li>`;
+            list.innerHTML = '';
+            let errLi = document.createElement('li');
+            errLi.style.color = 'var(--danger)';
+            errLi.style.listStyle = 'none';
+            errLi.textContent = data.error;
+            list.appendChild(errLi);
             btn.disabled = false;
             btn.innerHTML = '<i class="fas fa-wind"></i> AI Ripple Effect Forecast';
         }
