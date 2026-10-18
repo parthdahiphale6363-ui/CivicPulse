@@ -2220,11 +2220,16 @@ spline-viewer::part(logo) {
     gap: 8px;
 }
 
-.detail-section p,
-.detail-section .ai-text {
+.detail-section p {
     color: var(--text-secondary);
     font-size: 15px;
     line-height: 1.7;
+}
+
+.detail-section .ai-text {
+    color: var(--text-primary);
+    font-size: 14.5px;
+    line-height: 1.8;
 }
 
 .ai-badge {
@@ -2248,25 +2253,27 @@ spline-viewer::part(logo) {
 }
 
 .meta-item {
-    background: rgba(15, 23, 42, 0.5);
-    padding: 16px;
+    background: #f8fafc;
+    padding: 16px 20px;
     border-radius: var(--radius-md);
-    border: 1px solid var(--border-light);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
 }
 
 .meta-item label {
     display: block;
     font-size: 11px;
-    font-weight: 600;
-    color: var(--text-muted);
+    font-weight: 700;
+    color: var(--text-secondary);
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.75px;
     margin-bottom: 6px;
 }
 
 .meta-item span {
     font-size: 15px;
     font-weight: 600;
+    color: var(--text-primary);
 }
 
 

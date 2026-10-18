@@ -747,13 +747,27 @@ def build_complaint_context(
 
 
 def clean_ai_text(text: str) -> str:
-    """Clean markdown artifacts, convert bold to plain readable text, and format clean bullets."""
+    """Clean markdown artifacts, convert bold to plain readable text, and format clean bullets and sections."""
     if not text:
         return ""
 
     cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL).strip()
-    cleaned = re.sub(r'\*\*(.*?)\*\*', r'\1', cleaned)
-    cleaned = re.sub(r'\*(.*?)\*', r'\1', cleaned)
+
+    # 1. Break headings onto new lines if followed by body text: '**1. Title** Body' -> '1. Title\nBody'
+    cleaned = re.sub(r'(\d+\.\s+[A-Za-z0-9\s/–—\-\(\)]+?)\*\*\s+([A-Z])', r'\1\n\2', cleaned)
+
+    # 2. Put newlines before bullets: ' * ' or '\n* ' -> '\n• '
+    cleaned = re.sub(r'(?:^|\s)\*\s+', r'\n• ', cleaned)
+
+    # 3. Put newlines before numbered items: e.g. '. 2.', ': 1.', 'text. **2.'
+    cleaned = re.sub(r'([.!?:]|\*\*)\s*(?:\*\*)?(\d+\.\s+)', r'\1\n\n\2', cleaned)
+
+    # 4. Handle 'Citizen tip:' and 'Reference:'
+    cleaned = re.sub(r'([.!?])\s*(Citizen tip:)', r'\1\n\n\2', cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r'([.!?])\s*(Reference:)', r'\1\n\n\2', cleaned, flags=re.IGNORECASE)
+
+    # 5. Remove all markdown asterisks completely
+    cleaned = cleaned.replace('**', '').replace('*', '')
     cleaned = re.sub(r'#{1,6}\s*', '', cleaned)
 
     lines = cleaned.splitlines()
@@ -763,9 +777,11 @@ def clean_ai_text(text: str) -> str:
         if stripped.startswith("- ") or stripped.startswith("* "):
             formatted_lines.append(f"• {stripped[2:].strip()}")
         else:
-            formatted_lines.append(line)
+            formatted_lines.append(stripped)
 
-    return "\n".join(formatted_lines).strip()
+    cleaned = "\n".join(formatted_lines).strip()
+    cleaned = re.sub(r'\n{3,}', '\n\n', cleaned).strip()
+    return cleaned
 
 
 def sanitize_ai_claims(text: str, context: str = "") -> str:

@@ -112,6 +112,11 @@ except Exception as e:
         return "\n".join(lines).strip()
 
 
+@app.template_filter('format_ai_text')
+def format_ai_text_filter(text):
+    return clean_ai_text(text) if text else ""
+
+
 # ---------------- GLOBAL ERROR HANDLING ----------------
 handler = RotatingFileHandler('app_errors.log', maxBytes=100000, backupCount=3)
 handler.setLevel(logging.ERROR)
