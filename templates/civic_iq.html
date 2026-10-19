@@ -489,22 +489,32 @@
     }
 
     function renderReport(data) {
+        if (!data || typeof data !== 'object') {
+            throw new Error("Unable to load city diagnostic report. Please try again.");
+        }
+
+        const cityName = (data.city || 'City').toString().toUpperCase();
+        const summaryText = data.summary || `Civic overview and municipal intelligence report for ${cityName}.`;
+        const healthScore = (typeof data.health_score === 'number') ? data.health_score : 70;
+        const grade = (data.grade || 'B').toString().toUpperCase();
+
         const header = document.getElementById('report-header');
-        const gradeColor = data.grade === 'A' ? '#10b981' : (data.grade === 'B' ? '#6366f1' : (data.grade === 'C' ? '#f59e0b' : '#f43f5e'));
+        const gradeColor = grade === 'A' ? '#10b981' : (grade === 'B' ? '#6366f1' : (grade === 'C' ? '#f59e0b' : '#f43f5e'));
         
         header.innerHTML = `
             <div style="text-align: left;">
-                <h2 style="font-family: 'Space Grotesk'; font-size: 3rem; font-weight: 800;">${data.city.toUpperCase()}</h2>
-                <p style="color: rgba(255,255,255,0.7); max-width: 500px;">${data.summary}</p>
+                <h2 style="font-family: 'Space Grotesk'; font-size: 3rem; font-weight: 800;">${cityName}</h2>
+                <p style="color: rgba(255,255,255,0.7); max-width: 500px;">${summaryText}</p>
                 <div id="civic-iq-sources" style="margin-top: 10px; font-size: 11px; color: rgba(255,255,255,0.6); display: none;"></div>
             </div>
             <div style="text-align: center;">
-                <div class="health-grade-box" style="--grade-color: ${gradeColor}">${data.grade}</div>
-                <div style="margin-top: 15px; font-weight: 800; color: ${gradeColor}">CIVIC HEALTH: ${data.health_score}%</div>
+                <div class="health-grade-box" style="--grade-color: ${gradeColor}">${grade}</div>
+                <div style="margin-top: 15px; font-weight: 800; color: ${gradeColor}">CIVIC HEALTH: ${healthScore}%</div>
             </div>
         `;
 
-        if (data.sources && data.sources.length > 0) {
+        const sourcesList = Array.isArray(data.sources) ? data.sources : [];
+        if (sourcesList.length > 0) {
             const sourcesContainer = document.getElementById('civic-iq-sources');
             if (sourcesContainer) {
                 sourcesContainer.style.display = 'block';
@@ -520,13 +530,13 @@
                 label.style.marginRight = '6px';
                 sourcesContainer.appendChild(label);
 
-                data.sources.forEach((s, idx) => {
+                sourcesList.forEach((s, idx) => {
                     if (idx > 0) {
                         const bullet = document.createTextNode(' • ');
                         sourcesContainer.appendChild(bullet);
                     }
-                    const titleText = s.title || 'Knowledge Base';
-                    const rawUrl = (s.source_url || '').trim();
+                    const titleText = (s && s.title) ? s.title : 'Knowledge Base';
+                    const rawUrl = (s && s.source_url ? s.source_url : '').trim();
                     const isHttpUrl = rawUrl.startsWith('http://') || rawUrl.startsWith('https://');
 
                     if (isHttpUrl) {
@@ -550,48 +560,62 @@
             }
         }
 
+        const problems = Array.isArray(data.top_problems) ? data.top_problems : [];
         const problemsList = document.getElementById('problems-list');
-        problemsList.innerHTML = data.top_problems.map((p, i) => `
+        problemsList.innerHTML = problems.map((p, i) => {
+            const dept = p.dept || 'Municipal Administration';
+            const contact = p.contact_number || '1800-233-0000';
+            const issue = p.issue || `Civic Issue #${i + 1}`;
+            const rights = p.legal_rights || 'Citizens Charter & Municipal Laws';
+            const action = p.action_guide || 'Report to designated ward officer.';
+            const rti = p.rti_template || '';
+
+            return `
             <div class="problem-card">
                 <div class="dept-tag">
-                    <i class="fas fa-building"></i> ${p.dept}
-                    <a href="tel:${p.contact_number}" class="contact-badge">
-                        <i class="fas fa-phone-alt"></i> ${p.contact_number}
+                    <i class="fas fa-building"></i> ${dept}
+                    <a href="tel:${contact}" class="contact-badge">
+                        <i class="fas fa-phone-alt"></i> ${contact}
                     </a>
                 </div>
-                <h4 style="margin-bottom: 10px; font-size: 1.2rem;">${i+1}. ${p.issue}</h4>
+                <h4 style="margin-bottom: 10px; font-size: 1.2rem;">${i+1}. ${issue}</h4>
                 <div style="font-size: 13px; color: rgba(255,255,255,0.7); margin-bottom: 10px;">
-                    <i class="fas fa-gavel"></i> <b>Legal Right:</b> ${p.legal_rights}
+                    <i class="fas fa-gavel"></i> <b>Legal Right:</b> ${rights}
                 </div>
                 <div style="font-size: 13px; color: var(--iq-accent); margin-bottom: 15px;">
-                    <i class="fas fa-directions"></i> <b>Action:</b> ${p.action_guide}
+                    <i class="fas fa-directions"></i> <b>Action:</b> ${action}
                 </div>
+                ${rti ? `
                 <button class="prime-btn" style="padding: 8px 15px; font-size: 11px; background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border-glass);" onclick="toggleRTI(${i})">
                     <i class="fas fa-file-contract"></i> GENERATE RTI TEMPLATE
                 </button>
                 <div id="rti-${i}" class="rti-box" style="display: none;">
                     <button class="copy-rti" onclick="copyRTI(${i})">COPY</button>
-                    <pre id="rti-text-${i}" style="white-space: pre-wrap;">${p.rti_template}</pre>
+                    <pre id="rti-text-${i}" style="white-space: pre-wrap;">${rti}</pre>
                 </div>
+                ` : ''}
             </div>
-        `).join('');
+            `;
+        }).join('');
 
         const matrix = document.getElementById('escalation-matrix');
-        matrix.innerHTML = data.escalation_matrix.map(m => `
+        const escalation = Array.isArray(data.escalation_matrix) ? data.escalation_matrix : [];
+        matrix.innerHTML = escalation.map(m => `
             <div class="escalation-step">
                 <div>
-                    <div style="font-weight: 800; font-size: 12px; color: var(--iq-primary);">${m.level}</div>
-                    <div style="font-size: 14px;">${m.entity}</div>
+                    <div style="font-weight: 800; font-size: 12px; color: var(--iq-primary);">${m.level || 'Escalation Step'}</div>
+                    <div style="font-size: 14px;">${m.entity || ''}</div>
                 </div>
             </div>
         `).join('');
 
         const directory = document.getElementById('city-directory');
-        directory.innerHTML = data.city_directory.map(d => `
+        const dirList = Array.isArray(data.city_directory) ? data.city_directory : [];
+        directory.innerHTML = dirList.map(d => `
             <div class="directory-item">
-                <div style="font-size: 13px; font-weight: 600;">${d.dept}</div>
-                <a href="tel:${d.contact}" class="contact-badge" style="background: var(--iq-accent); font-size: 12px;">
-                    <i class="fas fa-phone-alt"></i> ${d.contact}
+                <div style="font-size: 13px; font-weight: 600;">${d.dept || 'Department'}</div>
+                <a href="tel:${d.contact || '100'}" class="contact-badge" style="background: var(--iq-accent); font-size: 12px;">
+                    <i class="fas fa-phone-alt"></i> ${d.contact || '100'}
                 </a>
             </div>
         `).join('');
