@@ -264,35 +264,37 @@ function addChatMessage(text, type, sources) {
         if (sources && sources.length > 0) {
             const sourcesDiv = document.createElement('div');
             sourcesDiv.className = 'chat-sources';
-            sourcesDiv.style.marginTop = '8px';
-            sourcesDiv.style.paddingTop = '6px';
-            sourcesDiv.style.borderTop = '1px solid rgba(255,255,255,0.1)';
-            sourcesDiv.style.fontSize = '11px';
-            sourcesDiv.style.color = '#94a3b8';
+            sourcesDiv.style.marginTop = '12px';
+            sourcesDiv.style.padding = '8px 12px';
+            sourcesDiv.style.background = 'rgba(16, 185, 129, 0.12)';
+            sourcesDiv.style.border = '1px solid rgba(16, 185, 129, 0.35)';
+            sourcesDiv.style.borderRadius = '8px';
+            sourcesDiv.style.fontSize = '11.5px';
+            sourcesDiv.style.color = '#e2e8f0';
+            sourcesDiv.style.display = 'flex';
+            sourcesDiv.style.flexWrap = 'wrap';
+            sourcesDiv.style.alignItems = 'center';
+            sourcesDiv.style.gap = '6px';
             
             const titleSpan = document.createElement('span');
-            titleSpan.innerHTML = '<i class="fas fa-book-open" style="color:#10b981"></i> Based on: ';
+            titleSpan.innerHTML = '<strong style="color:#34d399; display:inline-flex; align-items:center; gap:4px;"><i class="fas fa-certificate"></i> Verified Knowledge:</strong>';
             sourcesDiv.appendChild(titleSpan);
 
-            sources.forEach((s, idx) => {
-                const sName = s.title || s.source || 'KB';
+            sources.forEach((s) => {
+                const sName = s.title || s.source || 'Civic Knowledge';
                 if (s.source_url) {
                     const a = document.createElement('a');
                     a.href = s.source_url;
                     a.target = '_blank';
                     a.rel = 'noopener noreferrer';
-                    a.textContent = sName;
-                    a.style.color = '#38bdf8';
-                    a.style.marginLeft = '4px';
+                    a.innerHTML = `<i class="fas fa-external-link-alt" style="font-size:10px; margin-right:3px;"></i>${escapeHTML(sName)}`;
+                    a.style.cssText = 'color:#38bdf8; background:rgba(56,189,248,0.12); border:1px solid rgba(56,189,248,0.25); padding:2px 8px; border-radius:12px; text-decoration:none; display:inline-flex; align-items:center;';
                     sourcesDiv.appendChild(a);
                 } else {
                     const span = document.createElement('span');
                     span.textContent = sName;
-                    span.style.marginLeft = '4px';
+                    span.style.cssText = 'color:#cbd5e1; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); padding:2px 8px; border-radius:12px;';
                     sourcesDiv.appendChild(span);
-                }
-                if (idx < sources.length - 1) {
-                    sourcesDiv.appendChild(document.createTextNode(' • '));
                 }
             });
             bubble.appendChild(sourcesDiv);
