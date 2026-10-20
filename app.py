@@ -548,6 +548,13 @@ class DBConnectionWrapper:
                 if isinstance(key, int):
                     return self._row[key]
                 return self._mapping[key]
+            def get(self, key, default=None):
+                try:
+                    return self[key]
+                except (KeyError, IndexError):
+                    return default
+            def __contains__(self, key):
+                return key in self._mapping
             def keys(self):
                 return self._mapping.keys()
             def __iter__(self):
@@ -1347,8 +1354,11 @@ Set is_duplicate=true ONLY if they clearly describe the same physical problem at
             conn.execute("INSERT INTO complaint_subscribers (complaint_id, user_id, created_at) VALUES (?, ?, ?)",
                          (matched_complaint_id, session.get('user_id', 0), created_at))
             conn.commit()
-        except sqlite3.IntegrityError:
-            pass # User already subscribed to this issue
+        except (sqlite3.IntegrityError, Exception):
+            try:
+                conn.session.rollback()
+            except Exception:
+                pass # User already subscribed to this issue
             
         conn.close()
         flash('Notice: This issue is already being tracked! You have been subscribed to updates.', 'info')
@@ -2241,6 +2251,7 @@ Keep all text highly professional, action-oriented, and realistic."""
 
 # ======== EXPORT COMPLAINTS AS CSV ========
 @app.route("/export/csv")
+@app.route("/export_csv")
 @admin_required
 def export_csv():
     conn = get_db_connection()
@@ -2454,22 +2465,80 @@ def generate_weekly_report():
     report = ask_groq(prompt, system_message="Formal Municipal Reporting AI. Use institutional and administrative tone.")
     return jsonify({"report": report})
 
-@app.route('/admin/dashboard')
-def admin_dashboard():
+@app.route('/admin/viral-alerts')
+def admin_viral_alerts():
+    if 'user_id' not in session or session.get('role') != 'admin':
+        return jsonify([])
     conn = get_db_connection()
-    complaints = conn.execute("SELECT id, category, latitude, longitude, priority, status FROM complaints WHERE latitude IS NOT NULL").fetchall()
+    complaints = conn.execute("""
+        SELECT id, category, upvotes, created_at, priority, status
+        FROM complaints
+        WHERE status != 'Resolved'
+        ORDER BY upvotes DESC, id DESC
+        LIMIT 6
+    """).fetchall()
     conn.close()
-    data = []
+
+    alerts = []
+    now = datetime.now()
     for c in complaints:
-        data.append({
+        days_pending = 1
+        if c.get("created_at"):
+            try:
+                created_dt = datetime.strptime(str(c["created_at"])[:19], "%Y-%m-%d %H:%M:%S")
+                days_pending = max(1, (now - created_dt).days)
+            except Exception:
+                days_pending = 1
+        
+        frustration = "High" if ((c.get("upvotes") or 0) >= 3 or days_pending >= 5 or c.get("priority") in ["Urgent", "High"]) else "Medium"
+        alerts.append({
             "id": c["id"],
-            "category": c["category"],
-            "lat": c["latitude"],
-            "lng": c["longitude"],
-            "priority": c["priority"],
-            "status": c["status"]
+            "category": c.get("category") or "General",
+            "frustration": frustration,
+            "upvotes": c.get("upvotes") or 0,
+            "days_pending": days_pending
         })
-    return jsonify(data)
+    return jsonify(alerts)
+
+@app.route("/api/hotspots")
+def api_hotspots():
+    conn = get_db_connection()
+    complaints = conn.execute("""
+        SELECT category, latitude, longitude
+        FROM complaints
+        WHERE latitude IS NOT NULL AND longitude IS NOT NULL
+        ORDER BY id DESC
+        LIMIT 50
+    """).fetchall()
+    conn.close()
+
+    clusters = {}
+    for c in complaints:
+        lat = c.get("latitude")
+        lng = c.get("longitude")
+        cat = c.get("category") or "Civic Hotspot"
+        if lat and lng:
+            key = (round(float(lat), 2), round(float(lng), 2), cat)
+            clusters[key] = clusters.get(key, 0) + 1
+
+    hotspots = []
+    for (lat, lng, cat), count in clusters.items():
+        prob = min(95, 55 + (count * 15))
+        hotspots.append({
+            "lat": lat,
+            "lng": lng,
+            "category": cat,
+            "probability": prob
+        })
+
+    if not hotspots:
+        hotspots = [
+            {"lat": 18.5204, "lng": 73.8567, "category": "Water Leakage", "probability": 78},
+            {"lat": 18.5314, "lng": 73.8446, "category": "Pothole", "probability": 85},
+            {"lat": 18.5089, "lng": 73.8259, "category": "Streetlight", "probability": 65}
+        ]
+
+    return jsonify(hotspots)
 
 @app.route("/api/map-data")
 def map_data():
