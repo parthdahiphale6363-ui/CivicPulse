@@ -94,9 +94,11 @@
                 <div style="font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                     {{ c.description[:70] }}{% if c.description|length > 70 %}...{% endif %}
                 </div>
-                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px;">
-                    {{ c.created_at[:10] if c.created_at else 'Recently' }} · {{ c.category or 'Other' }}
-                    {% if c.location %} · {{ c.location[:25] }}{% if c.location|length > 25 %}...{% endif %}{% endif %}
+                <div style="font-size: 12px; color: var(--text-muted); margin-top: 3px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <span style="font-family: monospace; font-weight: 700; color: #38bdf8; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); padding: 1px 6px; border-radius: 4px;">{{ c.tracking_token or ('CP-2026-' ~ '%04d' % c.id) }}</span>
+                    <span>{{ c.created_at[:10] if c.created_at else 'Recently' }} · {{ c.category or 'Other' }}</span>
+                    {% if c.location %}<span> · {{ c.location[:25] }}{% if c.location|length > 25 %}...{% endif %}</span>{% endif %}
+                    {% if c.is_escalated %}<span style="color: #f87171; font-weight: 700; font-size: 11px;"><i class="fas fa-bolt"></i> Escalated</span>{% endif %}
                 </div>
             </div>
             <div style="display: flex; gap: 8px; flex-shrink: 0; align-items: center;">
