@@ -11,3 +11,9 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.10.12
+      - key: RAG_ENABLED
+        value: "1"
+      - key: RAG_BACKEND
+        value: "sql"
+      - key: SUPABASE_DB_URL
+        sync: false

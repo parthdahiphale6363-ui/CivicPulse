@@ -114,32 +114,57 @@ def get_raw_psycopg_url() -> Optional[str]:
 
 @lru_cache(maxsize=1)
 def get_db_chunk_counts() -> Dict[str, int]:
-    """Get chunk counts by type directly via SQL with 3s timeout."""
+    """Get chunk counts by type directly via SQL with 3s timeout, or fallback to local files."""
     url = get_raw_psycopg_url()
-    if not url or not is_rag_enabled():
-        return {}
+    if url and is_rag_enabled():
+        try:
+            import psycopg
+            with psycopg.connect(url, connect_timeout=5) as conn:
+                with conn.cursor() as cur:
+                    cur.execute("SET statement_timeout = 3000;")
+                    cur.execute(
+                        """
+                        SELECT e.cmetadata->>'type' AS doc_type, COUNT(*)
+                        FROM langchain_pg_embedding e
+                        JOIN langchain_pg_collection c ON e.collection_id = c.uuid
+                        WHERE c.name = %s
+                        GROUP BY doc_type;
+                        """,
+                        (COLLECTION_NAME,)
+                    )
+                    counts = {}
+                    for doc_type, count in cur.fetchall():
+                        counts[doc_type or "general"] = int(count)
+                    if counts:
+                        return counts
+        except Exception as e:
+            logger.error(f"Error fetching DB chunk counts: {e}")
+
+    # Fallback: Count from local knowledge repository files
     try:
-        import psycopg
-        with psycopg.connect(url, connect_timeout=5) as conn:
-            with conn.cursor() as cur:
-                cur.execute("SET statement_timeout = 3000;")
-                cur.execute(
-                    """
-                    SELECT e.cmetadata->>'type' AS doc_type, COUNT(*)
-                    FROM langchain_pg_embedding e
-                    JOIN langchain_pg_collection c ON e.collection_id = c.uuid
-                    WHERE c.name = %s
-                    GROUP BY doc_type;
-                    """,
-                    (COLLECTION_NAME,)
-                )
-                counts = {}
-                for doc_type, count in cur.fetchall():
-                    counts[doc_type or "general"] = int(count)
-                return counts
-    except Exception as e:
-        logger.error(f"Error fetching DB chunk counts: {e}")
-        return {}
+        from pathlib import Path
+        knowledge_dir = Path(__file__).resolve().parent.parent / "knowledge"
+        if knowledge_dir.exists():
+            from collections import Counter
+            local_counts = Counter()
+            for f in knowledge_dir.glob("*.md"):
+                if f.name.startswith("_"):
+                    continue
+                stem = f.stem.lower()
+                doc_type = "general"
+                for prefix, t in [("dept_", "department"), ("sop_", "sop"), ("rti_", "legal"),
+                                  ("escalation_", "legal"), ("legal_", "legal"), ("disaster_", "disaster"),
+                                  ("health_", "health"), ("infra_", "infra"), ("seasonal_", "seasonal"),
+                                  ("playbook_", "playbook"), ("env_", "env"), ("guide_", "guide")]:
+                    if stem.startswith(prefix):
+                        doc_type = t
+                        break
+                local_counts[doc_type] += 1
+            if local_counts:
+                return dict(local_counts)
+    except Exception:
+        pass
+    return {}
 
 
 def get_rag_status_info() -> Dict[str, Any]:
@@ -273,6 +298,104 @@ def rewrite_query(message: str, history: Optional[List[Dict[str, str]]] = None) 
         return message
 
 
+def retrieve_context_local_files(
+    query_str: str,
+    k: int = 5,
+    types: Optional[List[str]] = None,
+    exclude_types: Optional[List[str]] = None
+) -> Tuple[str, List[Dict[str, str]]]:
+    """Offline/zero-config fallback: retrieve verified knowledge directly from local knowledge/ files."""
+    try:
+        from pathlib import Path
+        knowledge_dir = Path(__file__).resolve().parent.parent / "knowledge"
+        if not knowledge_dir.exists():
+            return "", []
+
+        query_tokens = set(re.findall(r'\b[a-zA-Z]{3,}\b', query_str.lower()))
+        stop_words = {"the", "and", "for", "with", "that", "this", "what", "how", "are", "you", "not", "have", "from", "within", "does", "can"}
+        query_tokens = [t for t in query_tokens if t not in stop_words]
+        if not query_tokens:
+            query_tokens = ["pmc", "pune", "civic"]
+
+        scored_files = []
+        for f in knowledge_dir.glob("*.md"):
+            if f.name.startswith("_"):
+                continue
+            try:
+                content = f.read_text(encoding="utf-8")
+                stem = f.stem.lower()
+
+                doc_type = "general"
+                for prefix, t in [("dept_", "department"), ("sop_", "sop"), ("rti_", "legal"),
+                                  ("escalation_", "legal"), ("legal_", "legal"), ("disaster_", "disaster"),
+                                  ("health_", "health"), ("infra_", "infra"), ("seasonal_", "seasonal"),
+                                  ("playbook_", "playbook"), ("env_", "env"), ("guide_", "guide")]:
+                    if stem.startswith(prefix):
+                        doc_type = t
+                        break
+
+                if exclude_types and doc_type in exclude_types:
+                    continue
+                if types and doc_type not in types:
+                    continue
+
+                content_lower = content.lower()
+                title_matches = sum(6 for t in query_tokens if t in stem)
+                body_matches = sum(content_lower.count(t) for t in query_tokens)
+                total_score = title_matches + body_matches
+
+                if total_score > 0:
+                    title = stem.replace("_", " ").title()
+                    source_url = ""
+                    if content.startswith("---"):
+                        parts = content.split("---", 2)
+                        if len(parts) >= 3:
+                            for line in parts[1].splitlines():
+                                if line.strip().lower().startswith("title:"):
+                                    title = line.split(":", 1)[1].strip().strip('"').strip("'")
+                                elif line.strip().lower().startswith("source_url:"):
+                                    source_url = line.split(":", 1)[1].strip().strip('"').strip("'")
+                                elif line.strip().lower().startswith("confirmed_facts_from:"):
+                                    val = line.split(":", 1)[1].strip().strip('"').strip("'")
+                                    if "http" in val:
+                                        m = re.search(r'https?://[^\s,]+', val)
+                                        if m:
+                                            source_url = m.group(0)
+
+                    scored_files.append((total_score, f, title, source_url, content))
+            except Exception:
+                continue
+
+        scored_files.sort(key=lambda x: x[0], reverse=True)
+        top_matches = scored_files[:k]
+        if not top_matches:
+            return "", []
+
+        context_blocks = []
+        sources_list = []
+        seen_titles = set()
+
+        for score, f, title, source_url, content in top_matches:
+            body = content
+            if content.startswith("---"):
+                parts = content.split("---", 2)
+                body = parts[2].strip() if len(parts) >= 3 else content
+
+            context_blocks.append(f"[{title}]\n{body[:1200].strip()}")
+            if title not in seen_titles:
+                seen_titles.add(title)
+                entry = {"title": title}
+                if source_url:
+                    entry["source_url"] = source_url
+                sources_list.append(entry)
+
+        return "\n\n---\n\n".join(context_blocks), sources_list
+
+    except Exception as e:
+        logger.error(f"Error in retrieve_context_local_files: {e}")
+        return "", []
+
+
 def retrieve_context_sql(
     query_str: str,
     k: int = 5,
@@ -284,27 +407,27 @@ def retrieve_context_sql(
     """Lightweight direct SQL retrieval using psycopg and pgvector (<=> cosine distance).
 
     No LangChain imported at runtime. Enforces statement_timeout=3s, connect_timeout=5s,
-    and a total retrieval time budget of 4.0 seconds.
+    and a total retrieval time budget of 4.0 seconds. Falls back to local files if database is unconfigured.
     """
     global _last_retrieval_ms
     t0 = time.time()
 
     psycopg_url = get_raw_psycopg_url()
     if not psycopg_url:
-        return "", []
+        return retrieve_context_local_files(query_str, k=k, types=types, exclude_types=exclude_types)
 
     try:
         search_query = rewrite_query(query_str)
         if time.time() - t0 > timeout_budget:
             logger.warning(f"RAG SQL retrieval exceeded budget during query rewrite ({time.time() - t0:.2f}s). Skipping.")
-            return "", []
+            return retrieve_context_local_files(query_str, k=k, types=types, exclude_types=exclude_types)
 
         from .embeddings import embed_query_cached
         emb = list(embed_query_cached(search_query))
 
         if time.time() - t0 > timeout_budget:
             logger.warning(f"RAG SQL retrieval exceeded budget during embedding ({time.time() - t0:.2f}s). Skipping.")
-            return "", []
+            return retrieve_context_local_files(query_str, k=k, types=types, exclude_types=exclude_types)
 
         import psycopg
         k_fetch = max(8, k * 2)
@@ -370,7 +493,7 @@ def retrieve_context_sql(
         _last_retrieval_ms = round((time.time() - t0) * 1000, 2)
 
         if not valid_docs:
-            return "", []
+            return retrieve_context_local_files(query_str, k=k, types=types, exclude_types=exclude_types)
 
         context_blocks = []
         for doc_text, meta, score in valid_docs:
@@ -384,7 +507,7 @@ def retrieve_context_sql(
 
     except Exception as e:
         logger.error(f"Error in retrieve_context_sql: {e}")
-        return "", []
+        return retrieve_context_local_files(query_str, k=k, types=types, exclude_types=exclude_types)
 
 
 def retrieve_context_langchain(
